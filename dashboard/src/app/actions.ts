@@ -286,3 +286,43 @@ export async function updateAdminCredentials(formData: FormData) {
   return { success: true };
 }
 
+export async function getPunchesForAnomaly(reportId: string) {
+  await verifyAuth();
+
+  try {
+    const report = await prisma.calculatedDailyReport.findUnique({
+      where: { id: reportId },
+      include: { user: true }
+    });
+
+    if (!report) {
+      return { success: false, error: "Report not found" };
+    }
+
+    const startOfDay = new Date(report.date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(report.date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const punches = await prisma.rawPunch.findMany({
+      where: {
+        zktecoUserId: report.user.zktecoUserId,
+        recordTime: {
+          gte: startOfDay,
+          lte: endOfDay
+        }
+      },
+      orderBy: {
+        recordTime: 'asc'
+      }
+    });
+
+    return { success: true, punches };
+  } catch (error) {
+    console.error("Failed to get punches for anomaly:", error);
+    return { success: false, error: String(error) };
+  }
+}
+
+
