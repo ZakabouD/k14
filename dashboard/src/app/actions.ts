@@ -325,4 +325,30 @@ export async function getPunchesForAnomaly(reportId: string) {
   }
 }
 
+export async function getArtisanHistory(artisanId: string) {
+  await verifyAuth();
+
+  try {
+    const artisan = await prisma.user.findUnique({
+      where: { id: artisanId }
+    });
+
+    if (!artisan) {
+      return { success: false, error: "Artisan not found" };
+    }
+
+    const punches = await prisma.rawPunch.findMany({
+      where: { zktecoUserId: artisan.zktecoUserId },
+      orderBy: { recordTime: 'desc' },
+      take: 50
+    });
+
+    return { success: true, punches };
+  } catch (error) {
+    console.error("Failed to get artisan history:", error);
+    return { success: false, error: String(error) };
+  }
+}
+
+
 
