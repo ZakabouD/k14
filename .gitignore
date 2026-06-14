@@ -3,3 +3,10 @@ node_modules
 .env
 
 /generated/prisma
+
+# Build and temporary files
+dist/
+scratch/
+.DS_Store
+*.log
+
