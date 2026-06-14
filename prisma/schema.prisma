@@ -1,0 +1,94 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String  @id @default(uuid())
+  zktecoUserId String  @unique // Maps to 'user_id' from device
+  firstName    String
+  lastName     String
+  isActive     Boolean @default(true)
+
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id])
+
+  rawPunches   RawPunch[]
+  dailyReports CalculatedDailyReport[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Shift {
+  id        String @id @default(uuid())
+  name      String // e.g., "Standard 8-Hour"
+  startTime String // e.g., "08:00"
+  endTime   String // e.g., "17:00"
+  baseHours Float // e.g., 8.0
+
+  users User[]
+}
+
+model RawPunch {
+  id           String   @id @default(uuid())
+  sn           Int // Serial number from device
+  zktecoUserId String // 'user_id' from device
+  recordTime   DateTime // Parsed ISO date from 'record_time'
+  type         Int // Check-in, check-out, etc.
+  state        Int
+  ip           String // IP of the emitting device
+
+  user User @relation(fields: [zktecoUserId], references: [zktecoUserId])
+
+  // Composite unique constraint ensures idempotency on upsert
+  @@unique([zktecoUserId, recordTime])
+  @@index([zktecoUserId, recordTime])
+}
+
+model CalculatedDailyReport {
+  id     String   @id @default(uuid())
+  userId String
+  date   DateTime @db.Date // The specific working day
+
+  firstPunchIn DateTime?
+  lastPunchOut DateTime?
+
+  regularHours     Float @default(0)
+  overtime150Hours Float @default(0)
+  overtime200Hours Float @default(0)
+
+  status        ReportStatus @default(PENDING)
+  anomalyReason String? // e.g., "Missing Check-out"
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+}
+
+enum ReportStatus {
+  OK
+  ANOMALY
+  PENDING
+  RESOLVED
+}
+
+model SystemSettings {
+  id                String   @id @default("singleton")
+  adminEmail        String   @unique
+  adminPasswordHash String
+  deviceIp          String   @default("192.168.11.201")
+  devicePort        Int      @default(4370)
+  deviceTimeout     Int      @default(15000)
+  syncRequested     Boolean  @default(false)
+  syncStatus        String   @default("IDLE") // IDLE, PENDING, RUNNING, SUCCESS, ERROR
+  syncError         String?
+
+  updatedAt DateTime @updatedAt
+}
+
