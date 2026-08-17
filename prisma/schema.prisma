@@ -14,23 +14,46 @@ model User {
   firstName    String
   lastName     String
   isActive     Boolean @default(true)
+  isExempt     Boolean @default(false)
 
   shiftId String?
   shift   Shift?  @relation(fields: [shiftId], references: [id])
 
+  hourlyRate   Float     @default(0.0)
+  phone        String?
+  cin          String?
+  cnss         String?
+  hireDate     DateTime?
+  exitDate     DateTime?
+  exitReason   String?
+  monthlySalary Float     @default(0.0)
+  paymentFrequency String  @default("MONTHLY")
+  contractType  String?
+  bankName      String?
+  rib           String?
+  maritalStatus String?
+  childrenCount Int       @default(0)
+  address       String?
+
   rawPunches   RawPunch[]
   dailyReports CalculatedDailyReport[]
+  leaves       Leave[]
+  salaryTransactions SalaryTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Shift {
-  id        String @id @default(uuid())
-  name      String // e.g., "Standard 8-Hour"
-  startTime String // e.g., "08:00"
-  endTime   String // e.g., "17:00"
-  baseHours Float // e.g., 8.0
+  id            String @id @default(uuid())
+  name          String // e.g., "Standard 8-Hour"
+  startTime     String // e.g., "08:00"
+  endTime       String // e.g., "17:00"
+  baseHours     Float  // e.g., 8.0
+  lunchBreak    Int    @default(0)
+  gracePeriod   Int    @default(15)
+  saturdayHours Float  @default(4.0)
+  autoClose     Boolean @default(false)
 
   users User[]
 }
@@ -76,6 +99,8 @@ enum ReportStatus {
   ANOMALY
   PENDING
   RESOLVED
+  LEAVE
+  HOLIDAY
 }
 
 model SystemSettings {
@@ -88,7 +113,102 @@ model SystemSettings {
   syncRequested     Boolean  @default(false)
   syncStatus        String   @default("IDLE") // IDLE, PENDING, RUNNING, SUCCESS, ERROR
   syncError         String?
+  lastHeartbeat     DateTime?
+  deviceOnline      Boolean  @default(false)
+  otThresholdLimit  Float    @default(2.0)
+  otRate1           Float    @default(1.5)
+  otRate2           Float    @default(2.0)
+  contractTypes     String   @default("CDI,CDD,Intérim,ANAPEC,Autre")
+  maritalStatuses   String   @default("Célibataire,Marié(e),Divorcé(e),Veuf(ve)")
+  leaveTypes        String   @default("Congé Payé,Maladie,RTT,Congé Sans Solde,Récupération")
+  gracePeriod       Int      @default(15)
 
   updatedAt DateTime @updatedAt
+}
+
+model Leave {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  startDate DateTime    @db.Date
+  endDate   DateTime    @db.Date
+  type      String
+  status    LeaveStatus @default(APPROVED)
+  comment   String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId, startDate, endDate])
+}
+
+enum LeaveType {
+  CONGE_PAYE
+  MALADIE
+  RTT
+  SANS_SOLDE
+  RECUPERATION
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Holiday {
+  id   String   @id @default(uuid())
+  date DateTime @unique @db.Date
+  name String
+}
+
+model DashboardUser {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  passwordHash        String
+  name                String
+  role                String   @default("MANAGER") // SUPERADMIN, ADMIN, MANAGER
+  
+  // Specific switches
+  canManagePersonnel  Boolean  @default(false)
+  canManageShifts     Boolean  @default(false)
+  canManageLeaves     Boolean  @default(false)
+  canViewSalaries     Boolean  @default(false)
+  canManageSettings   Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+enum TransactionType {
+  ADVANCE
+  ACOMPTE
+  BONUS
+  DEDUCTION
+  FINAL_PAY
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHECK
+}
+
+model SalaryTransaction {
+  id              String          @id @default(uuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            TransactionType @default(ADVANCE)
+  amount          Float
+  date            DateTime        @default(now())
+  periodDate      DateTime?
+  periodStartDate DateTime?
+  periodEndDate   DateTime?
+  method          PaymentMethod   @default(CASH)
+  reference       String?
+  notes           String?
+  createdBy       String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 }
 

@@ -5,6 +5,35 @@ import { ZKTecoRecord, ZKTecoUser } from '../types/zkteco.types';
 // @ts-ignore
 import Zkteco from 'zkteco-js';
 import { prisma } from '../config/database';
+import net from 'net';
+
+function checkDeviceReachable(ip: string, port: number, timeoutMs = 2000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let isResolved = false;
+
+    socket.setTimeout(timeoutMs);
+
+    socket.connect(port, ip, () => {
+      if (!isResolved) {
+        isResolved = true;
+        socket.destroy();
+        resolve(true);
+      }
+    });
+
+    const handleFailure = () => {
+      if (!isResolved) {
+        isResolved = true;
+        socket.destroy();
+        resolve(false);
+      }
+    };
+
+    socket.on('error', handleFailure);
+    socket.on('timeout', handleFailure);
+  });
+}
 
 const DEVICE_IP = '192.168.11.201';
 const DEVICE_PORT = 4370;
@@ -58,6 +87,10 @@ export class SyncWorker {
   private job: CronJob;
   private isRunning = false;
   private pollInterval: NodeJS.Timeout | null = null;
+  
+  private lastHeartbeatTime = 0;
+  private lastDeviceCheckTime = 0;
+  private isDeviceOnlineCached = false;
 
   constructor() {
     // Run every 15 minutes
@@ -85,8 +118,40 @@ export class SyncWorker {
   }
 
   startManualSyncPolling() {
-    console.log('[SyncWorker] Starting manual sync requests polling (every 5 seconds)...');
+    console.log('[SyncWorker] Starting manual sync requests polling, heartbeat & device connection checks (every 5 seconds)...');
     this.pollInterval = setInterval(async () => {
+      // 1. Database Heartbeat & ZKTeco device connection checks
+      try {
+        const now = Date.now();
+        if (now - this.lastHeartbeatTime >= 10000) {
+          this.lastHeartbeatTime = now;
+
+          // Test device connection status every 20 seconds
+          if (now - this.lastDeviceCheckTime >= 20000) {
+            this.lastDeviceCheckTime = now;
+
+            const settings = await prisma.systemSettings.findFirst({
+              select: { deviceIp: true, devicePort: true }
+            });
+            const ip = settings?.deviceIp || DEVICE_IP;
+            const port = settings?.devicePort || DEVICE_PORT;
+
+            this.isDeviceOnlineCached = await checkDeviceReachable(ip, port, 3000);
+          }
+
+          await prisma.systemSettings.update({
+            where: { id: "singleton" },
+            data: {
+              lastHeartbeat: new Date(),
+              deviceOnline: this.isDeviceOnlineCached
+            }
+          });
+        }
+      } catch (error) {
+        console.error('[SyncWorker] Error in heartbeat/device check:', error);
+      }
+
+      // 2. Poll for manual sync requests
       if (this.isRunning) return;
 
       try {

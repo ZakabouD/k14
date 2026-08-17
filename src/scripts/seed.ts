@@ -9,7 +9,7 @@ async function main() {
   if (!existingSettings) {
     // Generate a strong, secure random password if none is provided via the environment
     const envPassword = process.env.ADMIN_PASSWORD;
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@workshop.com";
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@ecutsolutions.com";
     
     let passwordToUse: string = envPassword || "";
     let isGenerated = false;

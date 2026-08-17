@@ -30,7 +30,7 @@ export function SyncButton() {
       ) : (
         <Users className="w-5 h-5 mr-2" />
       )}
-      {isSyncing ? "Syncing..." : "Sync from Device"}
+      {isSyncing ? "Syncing..." : "Sync"}
     </button>
   );
 }

@@ -2,6 +2,17 @@ import { prisma } from '../config/database';
 import { Prisma } from '@prisma/client';
 
 export class ReportRepository {
+  async getReport(userId: string, date: Date) {
+    return prisma.calculatedDailyReport.findUnique({
+      where: {
+        userId_date: {
+          userId,
+          date,
+        },
+      },
+    });
+  }
+
   async upsertReport(data: Prisma.CalculatedDailyReportUncheckedCreateInput) {
     return prisma.calculatedDailyReport.upsert({
       where: {

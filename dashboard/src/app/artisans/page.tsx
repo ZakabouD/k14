@@ -1,29 +1,31 @@
 import { prisma } from "@/lib/prisma";
-import { SyncButton } from "@/components/SyncButton";
-import { ArtisanCard } from "@/components/ArtisanCard";
+import { parseContractTypes, parseMaritalStatuses } from "@/lib/tags";
+import { getSession } from "@/lib/session";
+import { ArtisansClient } from "@/components/ArtisansClient";
 
 export default async function ArtisansPage() {
   const artisans = await prisma.user.findMany({
-    orderBy: { zktecoUserId: 'asc' }
+    orderBy: [{ isActive: 'desc' }, { zktecoUserId: 'asc' }]
   });
   
   const shifts = await prisma.shift.findMany();
 
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Artisan Directory</h1>
-          <p className="text-foreground/60">Manage your workforce, assign shifts, and view profiles.</p>
-        </div>
-        <SyncButton />
-      </div>
+  const settings = await prisma.systemSettings.findFirst({
+    select: { contractTypes: true, maritalStatuses: true }
+  });
+  const contractTypesList = parseContractTypes(settings?.contractTypes || "");
+  const maritalStatusesList = parseMaritalStatuses(settings?.maritalStatuses || "");
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {artisans.map((artisan) => (
-          <ArtisanCard key={artisan.id} artisan={artisan} shifts={shifts} />
-        ))}
-      </div>
-    </div>
+  const session = await getSession();
+  const canViewSalaries = session?.adminId === "admin" || session?.permissions?.canViewSalaries === true;
+
+  return (
+    <ArtisansClient
+      artisans={artisans}
+      shifts={shifts}
+      contractTypesList={contractTypesList}
+      maritalStatusesList={maritalStatusesList}
+      canViewSalaries={canViewSalaries}
+    />
   );
 }

@@ -23,9 +23,9 @@ export async function decrypt(input: string): Promise<any> {
   return payload;
 }
 
-export async function createSession(adminId: string) {
+export async function createSession(adminId: string, userPayload?: any) {
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day
-  const session = await encrypt({ adminId, expires });
+  const session = await encrypt({ adminId, expires, ...userPayload });
 
   const cookieStore = await cookies();
   cookieStore.set("session", session, {
@@ -41,7 +41,24 @@ export async function getSession() {
   const cookieStore = await cookies();
   const session = cookieStore.get("session")?.value;
   if (!session) return null;
-  return await decrypt(session);
+  const payload = await decrypt(session);
+  if (!payload) return null;
+
+  // Apply fallback for master admin session
+  if (payload.adminId === "admin") {
+    payload.role = "SUPERADMIN";
+    payload.name = payload.name || "Administrateur Système";
+    payload.email = payload.email || "admin@ecutsolutions.com";
+    payload.permissions = {
+      canManagePersonnel: true,
+      canManageShifts: true,
+      canManageLeaves: true,
+      canViewSalaries: true,
+      canManageSettings: true
+    };
+  }
+
+  return payload;
 }
 
 export async function deleteSession() {

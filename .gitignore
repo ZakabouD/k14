@@ -1,6 +1,7 @@
 node_modules
 # Keep environment variables out of version control
 .env
+.env*
 
 /generated/prisma
 
@@ -8,5 +9,7 @@ node_modules
 dist/
 scratch/
 .DS_Store
+**/.DS_Store
 *.log
+task.md
 

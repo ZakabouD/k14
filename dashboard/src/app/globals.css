@@ -12,6 +12,30 @@
   --danger: #EF4444;
   --warning: #F59E0B;
   --border: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(30, 41, 59, 0.65);
+  --btn-sec-bg: rgba(255, 255, 255, 0.05);
+  --btn-sec-hover: rgba(255, 255, 255, 0.15);
+  --btn-sec-text: #F8FAFC;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+}
+
+.light {
+  --background: #F8FAFC; /* Slate 50 */
+  --foreground: #0F172A; /* Slate 900 */
+  --surface: #FFFFFF;
+  --surface-hover: #F1F5F9; /* Slate 100 */
+  --primary: #2563EB; /* Royal Blue */
+  --primary-glow: rgba(37, 99, 235, 0.15);
+  --accent: #7C3AED;
+  --success: #059669;
+  --danger: #DC2626;
+  --warning: #D97706;
+  --border: rgba(15, 23, 42, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --btn-sec-bg: rgba(15, 23, 42, 0.05);
+  --btn-sec-hover: rgba(15, 23, 42, 0.1);
+  --btn-sec-text: #0F172A;
+  --scrollbar-thumb: rgba(15, 23, 42, 0.15);
 }
 
 @theme inline {
@@ -25,6 +49,9 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-border: var(--border);
+  --color-btn-sec-bg: var(--btn-sec-bg);
+  --color-btn-sec-hover: var(--btn-sec-hover);
+  --color-btn-sec-text: var(--btn-sec-text);
 }
 
 body {
@@ -36,7 +63,7 @@ body {
 
 /* Glassmorphism utility */
 .glass-panel {
-  background: rgba(30, 41, 59, 0.65);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
@@ -52,7 +79,7 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--surface-hover);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {

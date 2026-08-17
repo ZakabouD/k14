@@ -1,0 +1,170 @@
+// dashboard/prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String  @id @default(uuid())
+  zktecoUserId String  @unique // Maps to 'user_id' from device
+  firstName    String
+  lastName     String
+  isActive     Boolean @default(true)
+  isExempt     Boolean @default(false)
+
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id])
+
+  hourlyRate   Float     @default(0.0)
+  phone        String?
+  cin          String?
+  cnss         String?
+  hireDate     DateTime?
+  exitDate     DateTime?
+  exitReason   String?
+  monthlySalary Float     @default(0.0)
+  paymentFrequency String  @default("MONTHLY")
+  contractType  String?
+  bankName      String?
+  rib           String?
+  maritalStatus String?
+  childrenCount Int       @default(0)
+  address       String?
+
+  rawPunches   RawPunch[]
+  dailyReports CalculatedDailyReport[]
+  leaves       Leave[]
+  salaryTransactions SalaryTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Shift {
+  id            String @id @default(uuid())
+  name          String // e.g., "Standard 8-Hour"
+  startTime     String // e.g., "08:00"
+  endTime       String // e.g., "17:00"
+  baseHours     Float  // e.g., 8.0
+  lunchBreak    Int    @default(0)
+  gracePeriod   Int    @default(15)
+  saturdayHours Float  @default(4.0)
+  autoClose     Boolean @default(false)
+
+  users User[]
+}
+
+model RawPunch {
+  id           String   @id @default(uuid())
+  sn           Int // Serial number from device
+  zktecoUserId String // 'user_id' from device
+  recordTime   DateTime // Parsed ISO date from 'record_time'
+  type         Int // Check-in, check-out, etc.
+  state        Int
+  ip           String // IP of the emitting device
+
+  user User @relation(fields: [zktecoUserId], references: [zktecoUserId])
+
+  @@unique([zktecoUserId, recordTime])
+  @@index([zktecoUserId, recordTime])
+}
+
+model CalculatedDailyReport {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  date             DateTime
+  firstPunchIn     DateTime?
+  lastPunchOut     DateTime?
+  regularHours     Float     @default(0)
+  overtime150Hours Float     @default(0)
+  overtime200Hours Float     @default(0)
+  status           String    @default("OK") // OK, ANOMALY, PENDING, RESOLVED, LEAVE, HOLIDAY
+  anomalyReason    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+}
+
+model Leave {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  startDate DateTime
+  endDate   DateTime
+  type      String   @default("Congé Payé") // Congé Payé, Unpaid, Sick, etc.
+  status    String   @default("APPROVED") // PENDING, APPROVED, REJECTED
+  comment   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Holiday {
+  id   String   @id @default(uuid())
+  name String
+  date DateTime @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SalaryTransaction {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  type            String   // ADVANCE, ACOMPTE, BONUS, DEDUCTION, FINAL_PAY
+  amount          Float
+  date            DateTime @default(now())
+  periodDate      DateTime?
+  periodStartDate DateTime?
+  periodEndDate   DateTime?
+  method          String   @default("CASH") // CASH, BANK_TRANSFER, CHECK
+  reference       String?  // Check #, transfer ref, etc.
+  notes           String?
+  createdBy       String?  // Admin who registered it
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SystemSettings {
+  id                String   @id @default("singleton")
+  deviceIp          String   @default("192.168.1.201")
+  devicePort        Int      @default(4370)
+  deviceTimeout     Int      @default(5000)
+  gracePeriod       Int      @default(15)
+  otThresholdLimit  Float    @default(2.0)
+  otRate1           Float    @default(1.5)
+  otRate2           Float    @default(2.0)
+  adminEmail        String   @default("admin@ecutsolutions.com")
+  adminPasswordHash String   @default("$2b$10$w0d3a7WjS1s1W5mYV7w5e.kG4e8z5x5w5e5x5w5e5x5w5e5x5w5e5")
+  contractTypes     String   @default("[]")
+  maritalStatuses   String   @default("[]")
+  leaveTypes        String   @default("[]")
+
+  updatedAt DateTime @updatedAt
+}
+
+model DashboardUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("ADMIN") // SUPERADMIN, ADMIN, MANAGER, HR, VIEWER
+
+  canManagePersonnel Boolean @default(true)
+  canManageShifts    Boolean @default(true)
+  canManageLeaves    Boolean @default(true)
+  canViewSalaries    Boolean @default(true)
+  canManageSettings  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

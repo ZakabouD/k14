@@ -31,10 +31,10 @@ export default function LoginPage() {
       <div className="glass-panel p-8 w-full max-w-md relative z-10">
         <div className="flex flex-col items-center mb-8">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4 shadow-[0_0_20px_var(--primary-glow)]">
-            <span className="font-bold text-white text-2xl">Z</span>
+            <span className="font-bold text-white text-2xl">e</span>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">ZKTeco<span className="text-primary font-medium">Sync</span></h1>
-          <p className="text-foreground/50 text-sm mt-1">Sign in to your workshop dashboard</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">e-Cut Solutions <span className="text-primary font-medium">Suivi</span></h1>
+          <p className="text-foreground/50 text-sm mt-1">Connectez-vous au suivi d'atelier</p>
         </div>
 
         {error && (
@@ -50,8 +50,8 @@ export default function LoginPage() {
               required
               name="email"
               type="email" 
-              placeholder="e.g. admin@workshop.com"
-              className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
+              placeholder="e.g. admin@ecutsolutions.com"
+              className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-primary transition-colors"
             />
           </div>
           
@@ -63,7 +63,7 @@ export default function LoginPage() {
                 name="password"
                 type="password" 
                 placeholder="Enter password"
-                className="w-full bg-black/20 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
+                className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-3 text-foreground focus:outline-none focus:border-primary transition-colors"
               />
               <Lock className="w-4 h-4 text-foreground/50 absolute left-4 top-1/2 -translate-y-1/2" />
             </div>
@@ -82,7 +82,7 @@ export default function LoginPage() {
       </div>
       
       <p className="absolute bottom-8 text-xs text-foreground/40 font-medium">
-        &copy; 2026 Professional ZKTeco Architecture
+        &copy; 2026 e-Cut Solutions Suivi
       </p>
     </div>
   );
