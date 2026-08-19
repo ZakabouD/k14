@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: zk_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-attendance}
+      POSTGRES_USER: ${POSTGRES_USER:-attendance_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-attendance_user} -d $${POSTGRES_DB:-attendance}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    container_name: zk_migrator
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-attendance_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-attendance}?schema=public
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      COMPANY_NAME: ${COMPANY_NAME:-Mon Entreprise}
+      DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-DH}
+      TIMEZONE: ${TIMEZONE:-Africa/Casablanca}
+    networks:
+      - internal_net
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: zk_dashboard
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-attendance_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-attendance}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - internal_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health | grep -q '\"status\":\"ok\"' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:
+    name: zk_commercial_postgres_data
+
+networks:
+  internal_net:
+    driver: bridge
