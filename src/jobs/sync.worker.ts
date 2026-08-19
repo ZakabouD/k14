@@ -1,10 +1,8 @@
 import { CronJob } from 'cron';
-import { syncService } from '../services/sync.service';
-import { calculationService } from '../services/calculation.service';
+import { deviceApiClient } from '../services/api-client';
 import { ZKTecoRecord, ZKTecoUser } from '../types/zkteco.types';
 // @ts-ignore
 import Zkteco from 'zkteco-js';
-import { prisma } from '../config/database';
 import net from 'net';
 
 function checkDeviceReachable(ip: string, port: number, timeoutMs = 2000): Promise<boolean> {
@@ -35,31 +33,12 @@ function checkDeviceReachable(ip: string, port: number, timeoutMs = 2000): Promi
   });
 }
 
-const getDeviceConfig = async () => {
-  const envIp = process.env.ZKTECO_IP;
-  const envPort = process.env.ZKTECO_PORT ? parseInt(process.env.ZKTECO_PORT, 10) : undefined;
-  const envTimeout = process.env.ZKTECO_TIMEOUT ? parseInt(process.env.ZKTECO_TIMEOUT, 10) : undefined;
+const getDeviceConfig = () => {
+  const ip = process.env.ZKTECO_IP || "192.168.1.201";
+  const port = process.env.ZKTECO_PORT ? parseInt(process.env.ZKTECO_PORT, 10) : 4370;
+  const timeout = process.env.ZKTECO_TIMEOUT ? parseInt(process.env.ZKTECO_TIMEOUT, 10) : 10000;
 
-  let dbIp: string | undefined;
-  let dbPort: number | undefined;
-  let dbTimeout: number | undefined;
-
-  try {
-    const settings = await prisma.systemSettings.findFirst({
-      select: { deviceIp: true, devicePort: true, deviceTimeout: true }
-    });
-    if (settings) {
-      dbIp = settings.deviceIp;
-      dbPort = settings.devicePort;
-      dbTimeout = settings.deviceTimeout;
-    }
-  } catch (e) {}
-
-  return {
-    ip: envIp || dbIp || "192.168.1.201",
-    port: envPort || dbPort || 4370,
-    timeout: envTimeout || dbTimeout || 10000
-  };
+  return { ip, port, timeout };
 };
 
 const MAX_CONNECTION_RETRIES = 3;
@@ -67,7 +46,7 @@ const MAX_CONNECTION_RETRIES = 3;
 const pullFromZKTecoWithRetry = async (
   retries = MAX_CONNECTION_RETRIES
 ): Promise<{ records: ZKTecoRecord[]; users: ZKTecoUser[] }> => {
-  const { ip, port, timeout } = await getDeviceConfig();
+  const { ip, port, timeout } = getDeviceConfig();
   const device = new Zkteco(ip, port, timeout, 4000);
   
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -118,23 +97,23 @@ export class SyncWorker {
   private isDeviceOnlineCached = false;
 
   constructor() {
-    // Run every 15 minutes
-    this.job = new CronJob('*/15 * * * *', () => this.execute(false));
+    const cronExpression = process.env.SYNC_INTERVAL_CRON || '*/15 * * * *';
+    this.job = new CronJob(cronExpression, () => this.execute(false));
   }
 
   start() {
-    console.log('[SyncWorker] Starting sync cron job (running every 15 minutes)...');
+    console.log('[SyncWorker] Starting sync cron job on Raspberry Pi bridge...');
     this.job.start();
     
-    // Start polling database for manual sync requests every 5 seconds
+    // Start polling API for manual sync requests & sending heartbeat every 5 seconds
     this.startManualSyncPolling();
 
-    // Force an immediate execution on boot!
+    // Trigger an initial execution on startup
     this.execute(false);
   }
 
   stop() {
-    console.log('[SyncWorker] Stopping sync cron job...');
+    console.log('[SyncWorker] Stopping sync worker...');
     this.job.stop();
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
@@ -143,48 +122,39 @@ export class SyncWorker {
   }
 
   startManualSyncPolling() {
-    console.log('[SyncWorker] Starting manual sync requests polling, heartbeat & device connection checks (every 5 seconds)...');
+    console.log('[SyncWorker] Starting API command polling & heartbeat monitor (every 5s)...');
     this.pollInterval = setInterval(async () => {
-      // 1. Database Heartbeat & ZKTeco device connection checks
+      const now = Date.now();
+      const { ip, port } = getDeviceConfig();
+
+      // 1. Send periodic Heartbeat to central server (every 10s)
       try {
-        const now = Date.now();
         if (now - this.lastHeartbeatTime >= 10000) {
           this.lastHeartbeatTime = now;
 
-          // Test device connection status every 20 seconds
+          // Check device network reachability every 20 seconds
           if (now - this.lastDeviceCheckTime >= 20000) {
             this.lastDeviceCheckTime = now;
-
-            const { ip, port } = await getDeviceConfig();
             this.isDeviceOnlineCached = await checkDeviceReachable(ip, port, 3000);
           }
 
-          await prisma.systemSettings.update({
-            where: { id: "singleton" },
-            data: {
-              lastHeartbeat: new Date(),
-              deviceOnline: this.isDeviceOnlineCached
-            }
-          });
+          await deviceApiClient.sendHeartbeat(this.isDeviceOnlineCached, ip);
         }
       } catch (error) {
-        console.error('[SyncWorker] Error in heartbeat/device check:', error);
+        console.warn('[SyncWorker] Heartbeat transmission error:', error);
       }
 
-      // 2. Poll for manual sync requests
+      // 2. Poll API for pending manual sync requests
       if (this.isRunning) return;
 
       try {
-        const settings = await prisma.systemSettings.findFirst({
-          select: { id: true, syncRequested: true }
-        });
-
-        if (settings?.syncRequested) {
-          console.log('[SyncWorker] Manual sync request detected!');
+        const commands = await deviceApiClient.getCommands();
+        if (commands.syncRequested) {
+          console.log('[SyncWorker] Manual sync request received from central API!');
           await this.execute(true);
         }
       } catch (error) {
-        console.error('[SyncWorker] Error polling manual sync requests:', error);
+        console.warn('[SyncWorker] Error polling manual sync commands:', error);
       }
     }, 5000);
   }
@@ -198,58 +168,26 @@ export class SyncWorker {
     this.isRunning = true;
     console.log(`[SyncWorker] Executing ${isManual ? 'manual ' : ''}sync at ${new Date().toISOString()}`);
 
-    if (isManual) {
-      try {
-        await prisma.systemSettings.update({
-          where: { id: "singleton" },
-          data: {
-            syncRequested: false, // Consume request immediately
-            syncStatus: "RUNNING"
-          }
-        });
-      } catch (e) {
-        console.error('[SyncWorker] Failed to update sync status to RUNNING:', e);
-      }
-    }
+    const { ip } = getDeviceConfig();
 
     try {
-      // 1. Pull data from device with retry logic
+      // 1. Pull data from hardware device with retry logic
       const { records, users } = await pullFromZKTecoWithRetry();
-      console.log(`[SyncWorker] Pulled ${records.length} raw records and ${users.length} users from device.`);
+      console.log(`[SyncWorker] Read ${records.length} punch records and ${users.length} users from hardware.`);
 
-      // 2. Safely sync to postgres
-      if (records.length > 0) {
-        await syncService.processIncomingRecords(records, users);
-      }
-      
-      // 3. Trigger recalculation for the current day
-      await calculationService.calculateDailyReports(new Date());
-      console.log(`[SyncWorker] Sync and calculation completed successfully.`);
+      // 2. Synchronize to central API over HTTPS in safe chunks
+      const syncResult = await deviceApiClient.syncRecords(records, users, ip);
+      console.log(`[SyncWorker] Sync complete! Stats: Received ${syncResult.received}, Inserted ${syncResult.inserted}, Duplicates ${syncResult.duplicates}`);
 
       if (isManual) {
-        await prisma.systemSettings.update({
-          where: { id: "singleton" },
-          data: {
-            syncStatus: "SUCCESS",
-            syncError: null
-          }
-        });
+        await deviceApiClient.acknowledgeCommand('SYNC', 'SUCCESS');
       }
     } catch (error: any) {
-      console.error('[SyncWorker] Error during execution:', error);
+      console.error('[SyncWorker] Error during sync execution:', error);
       if (isManual) {
-        try {
-          await prisma.systemSettings.update({
-            where: { id: "singleton" },
-            data: {
-              syncStatus: "ERROR",
-              syncError: error.message || String(error)
-            }
-          });
-        } catch (e) {
-          console.error('[SyncWorker] Failed to report manual sync error to database:', e);
-        }
+        await deviceApiClient.acknowledgeCommand('SYNC', 'ERROR', error.message || String(error));
       }
+      // Note: Records remain stored on ZKTeco hardware memory and will be retried automatically on next cycle
     } finally {
       this.isRunning = false;
     }
@@ -257,5 +195,3 @@ export class SyncWorker {
 }
 
 export const syncWorker = new SyncWorker();
-
-

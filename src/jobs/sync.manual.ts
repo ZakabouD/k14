@@ -1,16 +1,12 @@
-import { syncService } from '../services/sync.service';
-import { calculationService } from '../services/calculation.service';
+import { deviceApiClient } from '../services/api-client';
 import { ZKTecoRecord, ZKTecoUser } from '../types/zkteco.types';
 // @ts-ignore
 import Zkteco from 'zkteco-js';
 
-import { prisma } from '../config/database';
-
 const pullFromZKTeco = async (): Promise<{ records: ZKTecoRecord[], users: ZKTecoUser[] }> => {
-  const settings = await prisma.systemSettings.findFirst();
-  const deviceIp = process.env.ZKTECO_IP || settings?.deviceIp || "192.168.1.201";
-  const devicePort = process.env.ZKTECO_PORT ? parseInt(process.env.ZKTECO_PORT, 10) : (settings?.devicePort || 4370);
-  const deviceTimeout = process.env.ZKTECO_TIMEOUT ? parseInt(process.env.ZKTECO_TIMEOUT, 10) : (settings?.deviceTimeout || 10000);
+  const deviceIp = process.env.ZKTECO_IP || "192.168.1.201";
+  const devicePort = process.env.ZKTECO_PORT ? parseInt(process.env.ZKTECO_PORT, 10) : 4370;
+  const deviceTimeout = process.env.ZKTECO_TIMEOUT ? parseInt(process.env.ZKTECO_TIMEOUT, 10) : 10000;
 
   const device = new Zkteco(deviceIp, devicePort, deviceTimeout, 4000);
   try {
@@ -46,15 +42,14 @@ const pullFromZKTeco = async (): Promise<{ records: ZKTecoRecord[], users: ZKTec
 
 async function execute() {
   console.log(`[ManualSync] Executing manual sync at ${new Date().toISOString()}`);
+  const deviceIp = process.env.ZKTECO_IP || "192.168.1.201";
+
   try {
     const { records, users } = await pullFromZKTeco();
     console.log(`[ManualSync] Pulled ${records.length} raw records and ${users.length} users from device.`);
 
-    if (records.length > 0) {
-      await syncService.processIncomingRecords(records, users);
-      await calculationService.calculateDailyReports(new Date());
-      console.log(`[ManualSync] Sync and calculation completed successfully.`);
-    }
+    const syncResult = await deviceApiClient.syncRecords(records, users, deviceIp);
+    console.log(`[ManualSync] Sync complete: received=${syncResult.received}, inserted=${syncResult.inserted}, duplicates=${syncResult.duplicates}`);
     process.exit(0);
   } catch (error) {
     console.error('[ManualSync] Error during execution:', error);

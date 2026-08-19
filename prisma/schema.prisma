@@ -183,3 +183,19 @@ model DashboardUser {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 }
+
+model Device {
+  id            String    @id @default(uuid())
+  deviceId      String    @unique
+  name          String?
+  tokenHash     String
+  isActive      Boolean   @default(true)
+  deviceIp      String?
+  lastHeartbeat DateTime?
+  lastSyncAt    DateTime?
+  lastSeenAt    DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+}
+
