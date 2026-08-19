@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Device" ADD COLUMN "syncRequested" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "syncStatus" TEXT NOT NULL DEFAULT 'IDLE',
+ADD COLUMN "syncError" TEXT;

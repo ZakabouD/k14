@@ -194,8 +194,12 @@ model Device {
   lastHeartbeat DateTime?
   lastSyncAt    DateTime?
   lastSeenAt    DateTime?
+  syncRequested Boolean   @default(false)
+  syncStatus    String    @default("IDLE") // IDLE, PENDING, RUNNING, SUCCESS, ERROR
+  syncError     String?
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @default(now()) @updatedAt
 }
+
 

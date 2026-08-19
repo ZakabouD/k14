@@ -7,19 +7,34 @@ export async function POST(request: NextRequest) {
   if (!authResult.success) {
     return authResult.response;
   }
+  const device = authResult.device;
 
   try {
     const body = await request.json().catch(() => ({}));
     const status = body.status === "ERROR" ? "ERROR" : "SUCCESS";
     const error = body.error ? String(body.error) : null;
+    const now = new Date();
 
+    // 1. Update the specific authenticated device command state
+    await prisma.device.update({
+      where: { id: device.id },
+      data: {
+        syncRequested: false,
+        syncStatus: status,
+        syncError: error,
+        lastHeartbeat: now,
+        lastSeenAt: now
+      }
+    });
+
+    // 2. Mirror status to SystemSettings for existing dashboard UI compatibility
     await prisma.systemSettings.upsert({
       where: { id: "singleton" },
       update: {
         syncRequested: false,
         syncStatus: status,
         syncError: error,
-        lastHeartbeat: new Date(),
+        lastHeartbeat: now,
         deviceOnline: true
       },
       create: {
@@ -27,14 +42,16 @@ export async function POST(request: NextRequest) {
         syncRequested: false,
         syncStatus: status,
         syncError: error,
-        lastHeartbeat: new Date(),
+        lastHeartbeat: now,
         deviceOnline: true,
         adminPasswordHash: ""
       }
     });
 
     return NextResponse.json({
-      success: true
+      success: true,
+      deviceId: device.deviceId,
+      syncStatus: status
     });
   } catch (err: any) {
     console.error("[DeviceCommandAckAPI] Error processing command ack:", err);

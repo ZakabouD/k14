@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Synchronize device users if provided
+    // 2. Synchronize device users (Non-destructive: NEVER overwrites HR-managed fields)
     if (Array.isArray(users) && users.length > 0) {
       for (const u of users) {
         const rawUserId = String(u.userId || u.user_id || "").trim();
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Upsert strictly touches name fields if updating; never modifies HR fields
         await prisma.user.upsert({
           where: { zktecoUserId: rawUserId },
           update: rawName.length > 0 ? { firstName, lastName } : {},
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Ensure all users present in records exist in DB
+    // Ensure all punch users have at least a baseline employee record
     const uniqueUserIds = [...new Set(records.map((r: any) => String(r.zktecoUserId || r.user_id || "").trim()))].filter(Boolean);
     for (const uid of uniqueUserIds) {
       const existing = await prisma.user.findUnique({
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
       affectedDates.push(dateObj);
     }
 
+    // 4. Ingest Raw Punches (Primary source of truth - idempotent)
     let insertedCount = 0;
     if (validPunches.length > 0) {
       const result = await prisma.rawPunch.createMany({
@@ -135,12 +137,21 @@ export async function POST(request: NextRequest) {
     const receivedCount = records.length;
     const duplicatesCount = receivedCount - insertedCount;
 
-    // 4. Trigger Server-Side Attendance Calculation for affected dates
+    // 5. Trigger Server-Side Attendance Calculation (Resilient: failure does not lose raw punches)
+    let calculationSuccess = true;
+    let calculationError: string | null = null;
+
     if (affectedDates.length > 0) {
-      await serverCalculationService.calculateDailyReportsForDates(affectedDates);
+      try {
+        await serverCalculationService.calculateDailyReportsForDates(affectedDates);
+      } catch (calcErr: any) {
+        console.warn("[DeviceSyncAPI] Warning: Server attendance calculation encountered an error:", calcErr);
+        calculationSuccess = false;
+        calculationError = calcErr.message || String(calcErr);
+      }
     }
 
-    // 5. Update Device & System Status
+    // 6. Update Device and System Status
     const now = new Date();
     await prisma.device.update({
       where: { id: device.id },
@@ -148,6 +159,8 @@ export async function POST(request: NextRequest) {
         lastSyncAt: now,
         lastSeenAt: now,
         lastHeartbeat: now,
+        syncStatus: "SUCCESS",
+        syncError: calculationError ? `Punches saved. Calculation warning: ${calculationError}` : null,
         deviceIp: deviceIp || undefined
       }
     });
@@ -175,23 +188,19 @@ export async function POST(request: NextRequest) {
       received: receivedCount,
       inserted: insertedCount,
       duplicates: duplicatesCount,
-      failed: 0
+      failed: 0,
+      calculationSuccess,
+      calculationError
     });
   } catch (error: any) {
-    console.error("[DeviceSyncAPI] Error processing sync:", error);
+    console.error("[DeviceSyncAPI] Fatal error processing sync:", error);
 
     try {
-      await prisma.systemSettings.upsert({
-        where: { id: "singleton" },
-        update: {
+      await prisma.device.update({
+        where: { id: device.id },
+        data: {
           syncStatus: "ERROR",
           syncError: error.message || String(error)
-        },
-        create: {
-          id: "singleton",
-          syncStatus: "ERROR",
-          syncError: error.message || String(error),
-          adminPasswordHash: ""
         }
       });
     } catch (_) {}

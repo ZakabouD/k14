@@ -35,13 +35,30 @@ export async function triggerDeviceSync() {
   await verifyAuth();
   
   try {
-    // Set syncRequested to true and syncStatus to PENDING in SystemSettings
-    await prisma.systemSettings.update({
-      where: { id: "singleton" },
+    // 1. Set syncRequested to true on all active Devices
+    await prisma.device.updateMany({
+      where: { isActive: true },
       data: {
         syncRequested: true,
         syncStatus: "PENDING",
         syncError: null
+      }
+    });
+
+    // 2. Set syncRequested in SystemSettings for dashboard status mirroring
+    await prisma.systemSettings.upsert({
+      where: { id: "singleton" },
+      update: {
+        syncRequested: true,
+        syncStatus: "PENDING",
+        syncError: null
+      },
+      create: {
+        id: "singleton",
+        syncRequested: true,
+        syncStatus: "PENDING",
+        syncError: null,
+        adminPasswordHash: ""
       }
     });
 
@@ -72,12 +89,28 @@ export async function triggerDeviceSync() {
     }
     
     // If we timeout, reset the sync request to IDLE
-    await prisma.systemSettings.update({
-      where: { id: "singleton" },
+    await prisma.device.updateMany({
+      where: { isActive: true },
       data: {
         syncRequested: false,
         syncStatus: "IDLE",
         syncError: "Délai de synchronisation dépassé."
+      }
+    });
+
+    await prisma.systemSettings.upsert({
+      where: { id: "singleton" },
+      update: {
+        syncRequested: false,
+        syncStatus: "IDLE",
+        syncError: "Délai de synchronisation dépassé."
+      },
+      create: {
+        id: "singleton",
+        syncRequested: false,
+        syncStatus: "IDLE",
+        syncError: "Délai de synchronisation dépassé.",
+        adminPasswordHash: ""
       }
     });
     
