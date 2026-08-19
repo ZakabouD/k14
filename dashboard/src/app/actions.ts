@@ -778,7 +778,9 @@ export async function resolveAnomaly(
         update: {}
       });
     }
-  } catch (_) {}
+  } catch (error: any) {
+    console.error("[resolveAnomaly] Failed to record admin correction audit punches in RawPunch:", error?.message || error);
+  }
 
   revalidatePath("/");
   revalidatePath("/anomalies");
@@ -1360,12 +1362,14 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
 
   // Weekly Overtime summary
   const getWeekLabel = (dStr: string) => {
-    const date = new Date(dStr);
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(date.setDate(diff));
-    const dd = String(monday.getDate()).padStart(2, '0');
-    const mm = String(monday.getMonth() + 1).padStart(2, '0');
+    const d = new Date(dStr + "T00:00:00Z");
+    const comp = getLocalDateComponents(d, timezone);
+    const day = comp.dayOfWeek;
+    const diff = (day === 0 ? -6 : 1 - day);
+    const monday = new Date(Date.UTC(comp.year, comp.month - 1, comp.day + diff, 0, 0, 0, 0));
+    const monComp = getLocalDateComponents(monday, timezone);
+    const dd = String(monComp.day).padStart(2, '0');
+    const mm = String(monComp.month).padStart(2, '0');
     return `Sem. du ${dd}/${mm}`;
   };
 
@@ -1374,13 +1378,13 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
     const label = getWeekLabel(d.date);
     let item = weeklyMap.get(label);
     if (!item) {
-      const mon = new Date(d.date);
-      const day = mon.getDay();
-      const diff = mon.getDate() - day + (mon.getDay() === 0 ? -6 : 1);
-      mon.setDate(diff);
-      mon.setHours(0, 0, 0, 0);
+      const curDate = new Date(d.date + "T00:00:00Z");
+      const comp = getLocalDateComponents(curDate, timezone);
+      const day = comp.dayOfWeek;
+      const diff = (day === 0 ? -6 : 1 - day);
+      const monday = new Date(Date.UTC(comp.year, comp.month - 1, comp.day + diff, 0, 0, 0, 0));
 
-      item = { overtime150: 0, overtime200: 0, sortKey: mon.getTime() };
+      item = { overtime150: 0, overtime200: 0, sortKey: monday.getTime() };
       weeklyMap.set(label, item);
     }
     item.overtime150 += d.overtime150;
@@ -2303,8 +2307,7 @@ export async function getDashboardData(
   periodReports.forEach(r => {
     if (r.status === 'ANOMALY') anomalyCount++;
 
-    const day = r.date.getUTCDay();
-    const isWeekend = day === 0;
+    const isWeekend = isCompanySunday(r.date, timezone);
     const isHoliday = r.status === 'HOLIDAY';
     const isLeave = r.status === 'LEAVE';
 
