@@ -19,12 +19,16 @@ export class DeviceApiClient {
   private deviceId: string;
   private deviceToken: string;
   private chunkSize: number;
+  private maxRetries: number;
+  private baseRetryDelayMs: number;
 
   constructor() {
     this.baseUrl = (process.env.API_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
     this.deviceId = process.env.DEVICE_ID || "FACTORY-01";
     this.deviceToken = process.env.DEVICE_TOKEN || "";
     this.chunkSize = parseInt(process.env.SYNC_CHUNK_SIZE || "500", 10) || 500;
+    this.maxRetries = parseInt(process.env.SYNC_MAX_RETRIES || "3", 10) || 3;
+    this.baseRetryDelayMs = parseInt(process.env.SYNC_RETRY_DELAY_MS || "1000", 10) || 1000;
   }
 
   private getHeaders(): Record<string, string> {
@@ -33,6 +37,10 @@ export class DeviceApiClient {
       "x-device-id": this.deviceId,
       "x-device-token": this.deviceToken
     };
+  }
+
+  private isTransientStatus(status: number): boolean {
+    return status >= 500 || status === 429;
   }
 
   private async fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 30000): Promise<Response> {
@@ -50,8 +58,57 @@ export class DeviceApiClient {
     }
   }
 
+  private async postWithRetry(
+    url: string,
+    payload: any,
+    batchLabel: string,
+    maxRetries = this.maxRetries
+  ): Promise<any> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await this.fetchWithTimeout(url, {
+          method: "POST",
+          headers: this.getHeaders(),
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          return await res.json();
+        }
+
+        const errorText = await res.text();
+
+        // Non-transient client errors (400, 401, 403, 404, 413) should not be retried
+        if (!this.isTransientStatus(res.status)) {
+          throw new Error(`${batchLabel} rejected with non-retryable status ${res.status}: ${errorText}`);
+        }
+
+        // Transient status (500, 502, 503, 504, 429)
+        if (attempt === maxRetries) {
+          throw new Error(`${batchLabel} failed after ${maxRetries} attempts (HTTP ${res.status}): ${errorText}`);
+        }
+
+        const delayMs = attempt * this.baseRetryDelayMs;
+        console.warn(`[DeviceApiClient] ${batchLabel} received transient HTTP ${res.status}. Retrying attempt ${attempt + 1}/${maxRetries} in ${delayMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } catch (err: any) {
+        if (err.message?.includes("rejected with non-retryable status")) {
+          throw err;
+        }
+
+        if (attempt === maxRetries) {
+          throw new Error(`${batchLabel} failed after ${maxRetries} network attempts: ${err.message || String(err)}`);
+        }
+
+        const delayMs = attempt * this.baseRetryDelayMs;
+        console.warn(`[DeviceApiClient] ${batchLabel} encountered transient error (${err.message || err}). Retrying attempt ${attempt + 1}/${maxRetries} in ${delayMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
   /**
-   * Synchronizes records to the central server with client-side chunking.
+   * Synchronizes records to the central server with client-side chunking and transient error retry.
    */
   async syncRecords(
     records: ZKTecoRecord[],
@@ -67,7 +124,7 @@ export class DeviceApiClient {
     let totalDuplicates = 0;
     let totalFailed = 0;
 
-    // If there are no records, still sync users if any
+    // If there are no punch records, sync users if any
     if (totalRecords === 0) {
       if (users.length > 0) {
         const payload = {
@@ -81,16 +138,11 @@ export class DeviceApiClient {
           deviceIp
         };
 
-        const res = await this.fetchWithTimeout(`${this.baseUrl}/api/device/sync`, {
-          method: "POST",
-          headers: this.getHeaders(),
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`[DeviceApiClient] User sync failed (HTTP ${res.status}): ${errText}`);
-        }
+        await this.postWithRetry(
+          `${this.baseUrl}/api/device/sync`,
+          payload,
+          "User metadata batch"
+        );
       }
 
       return {
@@ -110,7 +162,7 @@ export class DeviceApiClient {
       const chunkIndex = Math.floor(i / this.chunkSize) + 1;
       const chunkRecords = records.slice(i, i + this.chunkSize);
 
-      // Only send user metadata in the first chunk to minimize payload overhead
+      // Only send user metadata in the first chunk
       const chunkUsers = (i === 0) 
         ? users.map(u => ({
             userId: u.userId,
@@ -137,19 +189,12 @@ export class DeviceApiClient {
 
       console.log(`[DeviceApiClient] Sending Batch ${chunkIndex}/${numChunks} (${chunkRecords.length} records)...`);
 
-      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/device/sync`, {
-        method: "POST",
-        headers: this.getHeaders(),
-        body: JSON.stringify(payload)
-      });
+      const data = await this.postWithRetry(
+        `${this.baseUrl}/api/device/sync`,
+        payload,
+        `Batch ${chunkIndex}/${numChunks}`
+      );
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error(`[DeviceApiClient] Batch ${chunkIndex} failed (HTTP ${res.status}):`, errorText);
-        throw new Error(`Batch ${chunkIndex}/${numChunks} failed with status ${res.status}: ${errorText}`);
-      }
-
-      const data = await res.json();
       totalInserted += data.inserted || 0;
       totalDuplicates += data.duplicates || 0;
       totalFailed += data.failed || 0;
