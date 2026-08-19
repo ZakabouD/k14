@@ -16,3 +16,12 @@ scratch/
 *.log
 docs/
 dev/
+
+# Database backups - exclude all dump, partial, and checksum files
+backups/**/*.dump
+backups/**/*.dump.partial
+backups/**/*.sha256
+backups/**/*.sql
+backups/**/*.tar
+backups/**/*.gz
+!backups/**/.gitkeep
