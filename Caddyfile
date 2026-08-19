@@ -8,8 +8,9 @@
 }
 
 {$APP_DOMAIN:localhost} {
-	# Reverse proxy to Next.js dashboard
+	# Reverse proxy to Next.js dashboard with strict forwarded IP sanitization
 	reverse_proxy dashboard:3000 {
+		header_up X-Forwarded-For {remote_host}
 		header_up X-Real-IP {remote_host}
 	}
 
