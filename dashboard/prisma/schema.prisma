@@ -41,7 +41,7 @@ model User {
   salaryTransactions SalaryTransaction[]
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model Shift {
@@ -88,7 +88,7 @@ model CalculatedDailyReport {
   anomalyReason    String?
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@unique([userId, date])
 }
@@ -104,7 +104,7 @@ model Leave {
   comment   String?
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@index([userId, startDate, endDate])
 }
@@ -115,7 +115,7 @@ model Holiday {
   date DateTime @unique
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model SalaryTransaction {
@@ -134,7 +134,7 @@ model SalaryTransaction {
   createdBy       String?   // Admin who registered it
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model SystemSettings {
@@ -164,7 +164,7 @@ model SystemSettings {
   maritalStatuses   String    @default("[]")
   leaveTypes        String    @default("[]")
 
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model DashboardUser {
@@ -181,5 +181,5 @@ model DashboardUser {
   canManageSettings  Boolean @default(false)
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 }
