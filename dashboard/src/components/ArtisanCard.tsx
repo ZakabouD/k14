@@ -10,13 +10,15 @@ export function ArtisanCard({
   shifts, 
   contractTypesList = [], 
   maritalStatusesList = [],
-  canViewSalaries = true
+  canViewSalaries = true,
+  currency = "DH"
 }: { 
   artisan: any, 
   shifts: any[], 
   contractTypesList?: any[], 
   maritalStatusesList?: any[],
-  canViewSalaries?: boolean
+  canViewSalaries?: boolean,
+  currency?: string
 }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -481,7 +483,7 @@ export function ArtisanCard({
                                     <span className="text-slate-300">📅 Date: {d.fullDate} ({d.dayName})</span>
                                     <span className="text-blue-400 font-black">⏱️ Total Heures: {d.totalHours} h ({d.regHours}h norm.)</span>
                                     {canViewSalaries && (
-                                      <span className="text-emerald-400 font-extrabold">💰 Coût Jour: {d.cost.toLocaleString("fr-FR")} DH</span>
+                                      <span className="text-emerald-400 font-extrabold">💰 Coût Jour: {d.cost.toLocaleString("fr-FR")} {currency}</span>
                                     )}
                                     {d.firstPunchStr ? (
                                       <span className="text-amber-300 font-bold">⏰ Pointage: {d.firstPunchStr} {d.lastPunchStr ? `➔ ${d.lastPunchStr}` : ""}</span>
@@ -554,27 +556,27 @@ export function ArtisanCard({
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between py-1.5 border-b border-border/50">
                           <span className="text-foreground/70 font-semibold">Taux Horaire de Base :</span>
-                          <span className="font-bold text-foreground">{stats.personal.hourlyRate} DH/h</span>
+                          <span className="font-bold text-foreground">{stats.personal.hourlyRate} {currency}/h</span>
                         </div>
                         <div className="flex justify-between py-1.5 border-b border-border/50">
                           <span className="text-foreground/70 font-semibold">Salaire de Base ({stats.hours.regular.toFixed(2)}h) :</span>
-                          <span className="font-bold text-foreground">{stats.financials.baseWages.toFixed(2)} DH</span>
+                          <span className="font-bold text-foreground">{stats.financials.baseWages.toFixed(2)} {currency}</span>
                         </div>
                         {stats.hours.overtime150 > 0 && (
                           <div className="flex justify-between py-1.5 border-b border-border/50 text-amber-500">
                             <span className="font-semibold">Majorations 150% ({stats.hours.overtime150.toFixed(2)}h) :</span>
-                            <span className="font-bold">+{stats.financials.overtime150Wages.toFixed(2)} DH</span>
+                            <span className="font-bold">+{stats.financials.overtime150Wages.toFixed(2)} {currency}</span>
                           </div>
                         )}
                         {stats.hours.overtime200 > 0 && (
                           <div className="flex justify-between py-1.5 border-b border-border/50 text-purple-500">
                             <span className="font-semibold">Majorations 200% ({stats.hours.overtime200.toFixed(2)}h) :</span>
-                            <span className="font-bold">+{stats.financials.overtime200Wages.toFixed(2)} DH</span>
+                            <span className="font-bold">+{stats.financials.overtime200Wages.toFixed(2)} {currency}</span>
                           </div>
                         )}
                         <div className="flex justify-between pt-2 text-sm font-black text-primary">
                           <span>Total Net Estimé Période :</span>
-                          <span className="text-lg">{stats.financials.totalPayout.toFixed(2)} DH</span>
+                          <span className="text-lg">{stats.financials.totalPayout.toFixed(2)} {currency}</span>
                         </div>
                       </div>
                     </div>
@@ -801,7 +803,7 @@ export function ArtisanCard({
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground/70 mb-1">
-                        {paymentFrequency === "WEEKLY" ? "Salaire Hebdomadaire (DH)" : "Salaire Mensuel Estimé (DH)"}
+                        {paymentFrequency === "WEEKLY" ? `Salaire Hebdomadaire (${currency})` : `Salaire Mensuel Estimé (${currency})`}
                       </label>
                       <input 
                         name="monthlySalary"
@@ -814,7 +816,7 @@ export function ArtisanCard({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground/70 mb-1">Taux Horaire (DH/heure)</label>
+                      <label className="block text-xs font-medium text-foreground/70 mb-1">Taux Horaire ({currency}/heure)</label>
                       <input 
                         required 
                         name="hourlyRate"

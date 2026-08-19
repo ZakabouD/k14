@@ -11,9 +11,16 @@ interface LeavesClientProps {
   artisans: any[];
   leaveTypesList?: any[];
   canViewSalaries?: boolean;
+  currency?: string;
 }
 
-export default function LeavesClient({ initialLeaves, artisans, leaveTypesList = [], canViewSalaries = true }: LeavesClientProps) {
+export default function LeavesClient({
+  initialLeaves,
+  artisans,
+  leaveTypesList = [],
+  canViewSalaries = true,
+  currency = "DH"
+}: LeavesClientProps) {
   const router = useRouter();
   const [userId, setUserId] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -266,7 +273,7 @@ export default function LeavesClient({ initialLeaves, artisans, leaveTypesList =
                   <p className="text-[11px] text-foreground/60">{formCostInfo.workingDays} jour(s) ouvré(s) • {formCostInfo.totalHours.toFixed(1)}h</p>
                 </div>
                 <div className="text-right font-extrabold text-lg text-primary">
-                  {canViewSalaries ? `${formCostInfo.cost.toFixed(2)} DH` : 'Confidentiel'}
+                  {canViewSalaries ? `${formCostInfo.cost.toFixed(2)} ${currency}` : 'Confidentiel'}
                 </div>
               </div>
             )}
@@ -349,7 +356,7 @@ export default function LeavesClient({ initialLeaves, artisans, leaveTypesList =
                           </td>
                           <td className="p-4">
                             <span className="font-bold text-primary">
-                              {canViewSalaries ? `${costInfo.cost.toFixed(2)} DH` : "Confidentiel"}
+                              {canViewSalaries ? `${costInfo.cost.toFixed(2)} ${currency}` : "Confidentiel"}
                             </span>
                             <p className="text-[11px] text-foreground/50 font-normal">
                               {costInfo.workingDays}j ({costInfo.totalHours.toFixed(1)}h)

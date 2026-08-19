@@ -13,6 +13,7 @@ interface ArtisansClientProps {
   contractTypesList: any[];
   maritalStatusesList: any[];
   canViewSalaries: boolean;
+  currency?: string;
 }
 
 export function ArtisansClient({
@@ -20,7 +21,8 @@ export function ArtisansClient({
   shifts,
   contractTypesList,
   maritalStatusesList,
-  canViewSalaries
+  canViewSalaries,
+  currency = "DH"
 }: ArtisansClientProps) {
   const [activeTab, setActiveTab] = useState<ArtisanTab>("ACTIVE");
   const [searchQuery, setSearchQuery] = useState("");
@@ -125,6 +127,7 @@ export function ArtisansClient({
               contractTypesList={contractTypesList}
               maritalStatusesList={maritalStatusesList}
               canViewSalaries={canViewSalaries}
+              currency={currency}
             />
           ))}
         </div>

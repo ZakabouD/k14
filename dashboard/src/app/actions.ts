@@ -288,7 +288,9 @@ export async function updateEmployeeProfile(formData: FormData) {
     }
   }
 
-  const moroccoNowStr = new Date().toLocaleString("en-US", { timeZone: "Africa/Casablanca" });
+  const settings = await prisma.systemSettings.findFirst({ select: { timezone: true } });
+  const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
+  const moroccoNowStr = new Date().toLocaleString("en-US", { timeZone: timezone });
   const localNow = new Date(moroccoNowStr);
   const todayUtc = new Date(Date.UTC(localNow.getFullYear(), localNow.getMonth(), localNow.getDate()));
 
@@ -408,8 +410,9 @@ export async function getEmployeeStats(userId: string, startDateStr: string, end
     });
 
     const settings = await prisma.systemSettings.findFirst({
-      select: { otRate1: true, otRate2: true, contractTypes: true }
+      select: { otRate1: true, otRate2: true, contractTypes: true, timezone: true }
     });
+    const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
 
     const otRate1 = settings?.otRate1 ?? 1.5;
     const otRate2 = settings?.otRate2 ?? 2.0;
@@ -494,10 +497,10 @@ export async function getEmployeeStats(userId: string, startDateStr: string, end
         cost = (reg * baseHourlyWage) + (o150 * baseHourlyWage * otRate1) + (o200 * baseHourlyWage * otRate2);
 
         if (r.firstPunchIn) {
-          firstPunchStr = new Date(r.firstPunchIn).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca' });
+          firstPunchStr = new Date(r.firstPunchIn).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit', timeZone: timezone });
         }
         if (r.lastPunchOut) {
-          lastPunchStr = new Date(r.lastPunchOut).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca' });
+          lastPunchStr = new Date(r.lastPunchOut).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit', timeZone: timezone });
         }
 
         status = r.status;
@@ -1019,8 +1022,10 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
   });
 
   const settings = await prisma.systemSettings.findFirst({
-    select: { otRate1: true, otRate2: true, contractTypes: true }
+    select: { otRate1: true, otRate2: true, contractTypes: true, timezone: true, currency: true }
   });
+  const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
+  const currency = settings?.currency || process.env.DEFAULT_CURRENCY || "DH";
   const otRate1 = settings?.otRate1 ?? 1.5;
   const otRate2 = settings?.otRate2 ?? 2.0;
   const parsedContracts = parseContractTypes(settings?.contractTypes || "[]");
@@ -1144,7 +1149,7 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
         new Date(p.recordTime).toLocaleTimeString("fr-FR", { 
           hour: "2-digit", 
           minute: "2-digit", 
-          timeZone: "Africa/Casablanca" 
+          timeZone: timezone 
         })
       );
 
@@ -1197,8 +1202,8 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
         dayName: dayNames[dayOfWeek],
         dayOfWeek,
         isSunday,
-        firstPunchIn: report?.firstPunchIn ? new Date(report.firstPunchIn).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Casablanca" }) : (punchTimes[0] || null),
-        lastPunchOut: report?.lastPunchOut ? new Date(report.lastPunchOut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Casablanca" }) : (punchTimes.length > 1 ? punchTimes[punchTimes.length - 1] : null),
+        firstPunchIn: report?.firstPunchIn ? new Date(report.firstPunchIn).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone }) : (punchTimes[0] || null),
+        lastPunchOut: report?.lastPunchOut ? new Date(report.lastPunchOut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone }) : (punchTimes.length > 1 ? punchTimes[punchTimes.length - 1] : null),
         punches: punchTimes,
         regularHours: Number(reg.toFixed(2)),
         overtime150Hours: Number(ot150.toFixed(2)),
@@ -1332,11 +1337,11 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
   const totalLogs = list.reduce((sum, r) => sum + r.dailyBreakdown.length, 0);
   const anomalyRate = totalLogs > 0 ? Number(((totalAnomalies / totalLogs) * 100).toFixed(1)) : 0;
 
-  // Peak activity hours in Morocco timezone
+  // Peak activity hours in configured timezone
   const hourlyBins = Array(24).fill(0);
   for (const p of punches) {
-    const moroccoStr = p.recordTime.toLocaleString("en-US", { timeZone: "Africa/Casablanca" });
-    const hr = new Date(moroccoStr).getHours();
+    const punchStr = p.recordTime.toLocaleString("en-US", { timeZone: timezone });
+    const hr = new Date(punchStr).getHours();
     hourlyBins[hr] += 1;
   }
 
@@ -1373,8 +1378,9 @@ export async function recalculateUserRange(userId: string, startDate: Date, endD
   if (!user) return;
 
   const settings = await prisma.systemSettings.findFirst({
-    select: { otThresholdLimit: true, gracePeriod: true }
+    select: { otThresholdLimit: true, gracePeriod: true, timezone: true }
   });
+  const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
   const threshold = settings?.otThresholdLimit ?? 2.0;
   const gracePeriod = user.shift ? user.shift.gracePeriod : (settings?.gracePeriod ?? 15);
 
@@ -1482,8 +1488,8 @@ export async function recalculateUserRange(userId: string, startDate: Date, endD
     }
 
     if (firstPunchIn && user.shift) {
-      const moroccoPunchStr = firstPunchIn.toLocaleString("en-US", { timeZone: "Africa/Casablanca" });
-      const localPunch = new Date(moroccoPunchStr);
+      const punchStr = firstPunchIn.toLocaleString("en-US", { timeZone: timezone });
+      const localPunch = new Date(punchStr);
       const punchMinutes = localPunch.getHours() * 60 + localPunch.getMinutes();
       
       const [shiftHrs, shiftMins] = user.shift.startTime.split(":").map(Number);
@@ -1521,8 +1527,8 @@ export async function recalculateUserRange(userId: string, startDate: Date, endD
     let status: 'OK' | 'ANOMALY' | 'PENDING' | 'LEAVE' | 'HOLIDAY' = isAnomaly ? 'ANOMALY' : 'OK';
 
     // If the report date is today and they have an odd number of punches, it is not an anomaly (they are currently working)
-    const moroccoTodayStr = new Date().toLocaleString("en-US", { timeZone: "Africa/Casablanca" });
-    const localToday = new Date(moroccoTodayStr);
+    const todayStr = new Date().toLocaleString("en-US", { timeZone: timezone });
+    const localToday = new Date(todayStr);
     const utcToday = new Date(Date.UTC(localToday.getFullYear(), localToday.getMonth(), localToday.getDate()));
     const isReportToday = startOfDay.getTime() === utcToday.getTime();
 
@@ -1863,9 +1869,11 @@ export async function importPublicHolidays() {
     }
   }
 
-  // 4. Determine current year in Morocco
-  const moroccoDateStr = new Date().toLocaleString("en-US", { timeZone: "Africa/Casablanca" });
-  const year = new Date(moroccoDateStr).getFullYear();
+  // 4. Determine current year in configured timezone
+  const settings = await prisma.systemSettings.findFirst({ select: { timezone: true } });
+  const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
+  const localDateStr = new Date().toLocaleString("en-US", { timeZone: timezone });
+  const year = new Date(localDateStr).getFullYear();
 
   let holidays: { date: string; name: string }[] = [];
 
@@ -2370,8 +2378,14 @@ export async function getDashboardData(
 ) {
   await verifyAuth();
 
-  const moroccoNowStr = new Date().toLocaleString("en-US", { timeZone: "Africa/Casablanca" });
-  const localNow = new Date(moroccoNowStr);
+  const settings = await prisma.systemSettings.findFirst({
+    select: { otRate1: true, otRate2: true, timezone: true, currency: true, contractTypes: true }
+  });
+  const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
+  const currency = settings?.currency || process.env.DEFAULT_CURRENCY || "DH";
+
+  const nowStr = new Date().toLocaleString("en-US", { timeZone: timezone });
+  const localNow = new Date(nowStr);
   const todayUtc = new Date(Date.UTC(localNow.getFullYear(), localNow.getMonth(), localNow.getDate()));
 
   let startDate: Date;
@@ -2429,7 +2443,6 @@ export async function getDashboardData(
     periodLabel = `Aujourd'hui (${dayFmt})`;
   }
 
-  const settings = await prisma.systemSettings.findFirst();
   const otRate1 = settings?.otRate1 ?? 1.5;
   const otRate2 = settings?.otRate2 ?? 2.0;
   const parsedContracts = parseContractTypes(settings?.contractTypes || "[]");
@@ -2646,7 +2659,7 @@ export async function getDashboardData(
       firstPunchInStr = new Date(reportWithPunch.firstPunchIn).toLocaleTimeString("fr-FR", {
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'Africa/Casablanca'
+        timeZone: timezone
       });
     }
 
@@ -2732,6 +2745,7 @@ export async function getDashboardData(
       fullyAbsentCount: employeeRows.filter(r => !r.isExempt && r.daysPresent === 0).length,
       totalOtHours: Number((totalOt150 + totalOt200).toFixed(2))
     },
+    currency,
     chartDays,
     employeeRows
   };

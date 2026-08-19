@@ -252,7 +252,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             periodStartDateStr: txnPeriodStartDate,
             periodEndDateStr: txnPeriodEndDate,
             method: txnMethod,
-            notes: `Arrondi de solde / Prime automatique (+${diff.toFixed(2)} DH)`
+            notes: `Arrondi de solde / Prime automatique (+${diff.toFixed(2)} ${currency})`
           });
         } else {
           await addSalaryTransaction({
@@ -264,7 +264,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             periodStartDateStr: txnPeriodStartDate,
             periodEndDateStr: txnPeriodEndDate,
             method: txnMethod,
-            notes: `Ajustement / Déduction automatique (-${Math.abs(diff).toFixed(2)} DH)`
+            notes: `Ajustement / Déduction automatique (-${Math.abs(diff).toFixed(2)} ${currency})`
           });
         }
       }
@@ -496,7 +496,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
           dateStr: activePeriodDate,
           periodDateStr: activePeriodDate,
           method: "CASH",
-          notes: `Ajustement / ${adjustReason} (+${diff.toFixed(2)} DH)`
+          notes: `Ajustement / ${adjustReason} (+${diff.toFixed(2)} ${currency})`
         });
         if (!res.success) {
           setModalError(res.error || "Échec de l'enregistrement.");
@@ -512,7 +512,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
           dateStr: activePeriodDate,
           periodDateStr: activePeriodDate,
           method: "CASH",
-          notes: `Ajustement / ${adjustReason} (-${absDiff.toFixed(2)} DH)`
+          notes: `Ajustement / ${adjustReason} (-${absDiff.toFixed(2)} ${currency})`
         });
         if (!res.success) {
           setModalError(res.error || "Échec de l'enregistrement.");
@@ -537,7 +537,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
       return;
     }
 
-    if (!confirm(`Voulez-vous arrondir au supérieur (multiple de ${step} DH) le solde net de ${targets.length} employé(s) ?`)) return;
+    if (!confirm(`Voulez-vous arrondir au supérieur (multiple de ${step} ${currency}) le solde net de ${targets.length} employé(s) ?`)) return;
 
     setIsLoading(true);
     const activePeriodDate = (selectedDate && selectedDate.includes("-"))
@@ -555,7 +555,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             amount: Number(diff.toFixed(2)),
             dateStr: activePeriodDate,
             method: "CASH",
-            notes: `Ajustement / Arrondi au supérieur (${u.netPayable.toFixed(2)} DH -> ${roundedNet} DH)`
+            notes: `Ajustement / Arrondi au supérieur (${u.netPayable.toFixed(2)} ${currency} -> ${roundedNet} ${currency})`
           });
         }
       }
@@ -784,7 +784,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             <div>
               <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wider mb-1">Masse Salariale Gagnée</p>
               <p className="text-xl font-bold text-foreground">
-                {filteredKpis.totalEarned.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                {filteredKpis.totalEarned.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
               </p>
             </div>
             <div className="p-2 rounded-xl bg-primary/10 text-primary">
@@ -799,7 +799,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             <div>
               <p className="text-[11px] font-semibold text-warning uppercase tracking-wider mb-1">Total Avances & Acomptes</p>
               <p className="text-xl font-bold text-warning">
-                {filteredKpis.totalAdvances.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                {filteredKpis.totalAdvances.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
               </p>
             </div>
             <div className="p-2 rounded-xl bg-warning/10 text-warning">
@@ -814,7 +814,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             <div>
               <p className="text-[11px] font-semibold text-emerald-500 uppercase tracking-wider mb-1">Total Primes Accordées</p>
               <p className="text-xl font-bold text-emerald-500">
-                {filteredKpis.totalBonuses.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                {filteredKpis.totalBonuses.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
               </p>
             </div>
             <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
@@ -829,7 +829,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             <div>
               <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-wider mb-1">Total Déjà Versé (Payé)</p>
               <p className="text-xl font-black text-blue-600">
-                {filteredKpis.totalFinalPaid.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                {filteredKpis.totalFinalPaid.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
               </p>
             </div>
             <div className="p-2 rounded-xl bg-blue-500/20 text-blue-600">
@@ -844,7 +844,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             <div>
               <p className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-1">Reste à Payer (Net)</p>
               <p className="text-xl font-black text-accent">
-                {filteredKpis.totalRemaining.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                {filteredKpis.totalRemaining.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
               </p>
             </div>
             <div className="p-2 rounded-xl bg-accent/20 text-accent">
@@ -917,10 +917,10 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                 <th className="p-4 font-semibold">Shift / Taux</th>
                 <th className="p-4 font-semibold text-center">Jrs / Heures</th>
                 <th className="p-4 font-semibold text-right">Salaire Gagné (Brut)</th>
-                <th className="p-4 font-semibold text-right text-warning">Avances (DH)</th>
-                <th className="p-4 font-semibold text-right text-emerald-500">Primes (DH)</th>
-                <th className="p-4 font-semibold text-right text-blue-500">Déjà Versé (DH)</th>
-                <th className="p-4 font-semibold text-right text-accent">Reste à Payer (DH)</th>
+                <th className="p-4 font-semibold text-right text-warning">Avances ({currency})</th>
+                <th className="p-4 font-semibold text-right text-emerald-500">Primes ({currency})</th>
+                <th className="p-4 font-semibold text-right text-blue-500">Déjà Versé ({currency})</th>
+                <th className="p-4 font-semibold text-right text-accent">Reste à Payer ({currency})</th>
                 <th className="p-4 font-semibold text-center">Statut</th>
                 <th className="p-4 font-semibold text-center">Actions</th>
               </tr>
@@ -977,14 +977,14 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                       <span className="text-xs bg-surface border border-border px-2 py-0.5 rounded font-medium block w-fit mb-0.5">
                         {row.shiftName}
                       </span>
-                      <span className="text-[11px] text-foreground/50 font-semibold">{row.hourlyRate} DH/h</span>
+                      <span className="text-[11px] text-foreground/50 font-semibold">{row.hourlyRate} {currency}/h</span>
                     </td>
                     <td className="p-4 text-center">
                       <span className="text-xs font-bold text-foreground block">{row.daysWorked} jours</span>
                       <span className="text-[11px] text-foreground/50">{row.totalHours} h</span>
                     </td>
                     <td className="p-4 text-right font-semibold text-foreground">
-                      {row.earnedSalary.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                      {row.earnedSalary.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                     </td>
                     <td className="p-4 text-right">
                       {row.advances > 0 ? (
@@ -992,19 +992,19 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                           onClick={() => handleOpenHistoryModal(row)}
                           className="font-bold text-warning hover:underline cursor-pointer"
                         >
-                          -{row.advances.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                          -{row.advances.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                         </button>
                       ) : (
-                        <span className="text-foreground/40 text-xs">0,00 DH</span>
+                        <span className="text-foreground/40 text-xs">0,00 {currency}</span>
                       )}
                     </td>
                     <td className="p-4 text-right">
                       {row.bonuses > 0 ? (
                         <span className="font-bold text-emerald-500">
-                          +{row.bonuses.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                          +{row.bonuses.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                         </span>
                       ) : (
-                        <span className="text-foreground/40 text-xs">0,00 DH</span>
+                        <span className="text-foreground/40 text-xs">0,00 {currency}</span>
                       )}
                     </td>
                     <td className="p-4 text-right">
@@ -1014,10 +1014,10 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                           className="font-bold text-blue-500 hover:underline cursor-pointer"
                           title="Voir les réglements déjà effectués"
                         >
-                          {row.finalPaid.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                          {row.finalPaid.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                         </button>
                       ) : (
-                        <span className="text-foreground/40 text-xs">0,00 DH</span>
+                        <span className="text-foreground/40 text-xs">0,00 {currency}</span>
                       )}
                     </td>
                     <td className="p-4 text-right">
@@ -1029,12 +1029,12 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                             ? 'bg-amber-500/10 text-amber-600 border-amber-500/20 shadow-sm'
                             : 'bg-primary/10 text-primary border-primary/20 shadow-sm'
                         }`}>
-                          {row.netPayable.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                          {row.netPayable.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                         </span>
                         <button
                           type="button"
                           onClick={() => handleOpenAdjustModal(row)}
-                          title="Ajuster / Arrondir le solde versé (ex: 641.64 DH -> 650 DH)"
+                          title={`Ajuster / Arrondir le solde versé (ex: 641.64 ${currency} -> 650 ${currency})`}
                           className="p-1 rounded-md bg-surface hover:bg-surface-hover text-foreground/60 hover:text-primary border border-border transition-colors cursor-pointer text-xs"
                         >
                           ✏️
@@ -1167,7 +1167,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                 >
                   {data.map(u => (
                     <option key={u.userId} value={u.userId}>
-                      {u.lastName.replace(/_/g, ' ').toUpperCase()} {u.firstName.replace(/_/g, ' ')} (Net restant: {u.netPayable.toFixed(2)} DH)
+                      {u.lastName.replace(/_/g, ' ').toUpperCase()} {u.firstName.replace(/_/g, ' ')} (Net restant: {u.netPayable.toFixed(2)} {currency})
                     </option>
                   ))}
                 </select>
@@ -1201,7 +1201,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                 {/* Amount */}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-foreground/70 mb-1.5">
-                    Montant (DH) *
+                    Montant ({currency}) *
                   </label>
                   <input
                     type="number"
@@ -1255,17 +1255,15 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
 
                 if (enteredAmount > 0 && Math.abs(diff) >= 0.01) {
                   return (
-                    <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-emerald-600">
-                          💡 Ajustement / Arrondi automatique: {diff > 0 ? `+${diff.toFixed(2)} DH` : `${diff.toFixed(2)} DH`}
-                        </span>
-                        <span className="text-[11px] text-foreground/60 font-semibold">
-                          Net Calculé: {calculatedNet.toFixed(2)} DH
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-foreground/70">
-                        Le virement ({enteredAmount.toFixed(2)} DH) diffère du solde calculé ({calculatedNet.toFixed(2)} DH). Une prime/ajustement sera automatiquement créée pour solder la période à 0,00 DH !
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-500 space-y-1">
+                      <p className="font-bold">
+                        💡 Ajustement / Arrondi automatique: {diff > 0 ? `+${diff.toFixed(2)} ${currency}` : `${diff.toFixed(2)} ${currency}`}
+                      </p>
+                      <p className="text-[11px] opacity-80">
+                        Net Calculé: {calculatedNet.toFixed(2)} {currency} • Montant Saisi: {enteredAmount.toFixed(2)} {currency}
+                      </p>
+                      <p className="text-[11px] font-semibold text-foreground/70 pt-1">
+                        Le virement ({enteredAmount.toFixed(2)} {currency}) diffère du solde calculé ({calculatedNet.toFixed(2)} {currency}). Une prime/ajustement sera automatiquement créée pour solder la période à 0,00 {currency} !
                       </p>
                     </div>
                   );
@@ -1437,9 +1435,9 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
 
                   <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center">
                     <span className="font-bold text-emerald-900 text-sm">MONTANT REÇU</span>
-                    <span className="font-black text-2xl text-emerald-700">
-                      {receiptTxn.amount.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
-                    </span>
+                    <p className="text-3xl font-black text-slate-900">
+                      {receiptTxn.amount.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
+                    </p>
                   </div>
 
                   {receiptTxn.notes && (
@@ -1547,7 +1545,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
 
                           <div className="flex items-center gap-3">
                             <span className="font-bold text-foreground text-base">
-                              {txn.amount.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                              {txn.amount.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                             </span>
                             <button
                               onClick={() => setReceiptTxn(txn)}
@@ -1698,7 +1696,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                     </div>
                     <div>
                       <span className="text-slate-500 block font-semibold">SHIFT & TAUX</span>
-                      <span className="font-bold text-slate-900 block mt-0.5">{u.shiftName} ({u.hourlyRate} DH/h)</span>
+                      <span className="font-bold text-slate-900 block mt-0.5">{u.shiftName} ({u.hourlyRate} {currency}/h)</span>
                     </div>
                     <div>
                       <span className="text-slate-500 block font-semibold">FRÉQUENCE</span>
@@ -1707,31 +1705,31 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                   </div>
 
                   {/* Wage Breakdown Table */}
-                  <table className="w-full text-xs text-left border-collapse border-2 border-slate-300">
+                  <table className="w-full text-xs text-left border-collapse border border-slate-300">
                     <thead>
-                      <tr className="bg-slate-200 text-slate-900 font-black border-b-2 border-slate-300 uppercase tracking-wider">
-                        <th className="p-3 border-r border-slate-300">Élément de Paie</th>
-                        <th className="p-3 border-r border-slate-300 text-center">Quantité / Heures</th>
-                        <th className="p-3 border-r border-slate-300 text-right">Taux (DH/h)</th>
-                        <th className="p-3 text-right">Montant Gagné (DH)</th>
+                      <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-300">
+                        <th className="p-3 border-r border-slate-300">Rubrique de Gain / Heures</th>
+                        <th className="p-3 border-r border-slate-300 text-right">Base (Heures)</th>
+                        <th className="p-3 border-r border-slate-300 text-right">Taux ({currency}/h)</th>
+                        <th className="p-3 text-right">Montant Gagné ({currency})</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y border-slate-300">
+                    <tbody className="divide-y divide-slate-300">
                       <tr>
                         <td className="p-3 font-bold text-slate-900 border-r border-slate-300">Heures Normales Travaillées</td>
                         <td className="p-3 text-center border-r border-slate-300 font-semibold">{u.regularHours || 0} h</td>
-                        <td className="p-3 text-right border-r border-slate-300 text-slate-700">{u.hourlyRate} DH</td>
+                        <td className="p-3 text-right border-r border-slate-300 text-slate-700">{u.hourlyRate} {currency}</td>
                         <td className="p-3 text-right font-black text-slate-900">
-                          {((u.regularHours || 0) * (u.hourlyRate || 0)).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                          {((u.regularHours || 0) * (u.hourlyRate || 0)).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                         </td>
                       </tr>
                       {(u.ot150 || 0) > 0 && (
                         <tr>
                           <td className="p-3 font-bold text-blue-700 border-r border-slate-300">Heures Supplémentaires 150%</td>
                           <td className="p-3 text-center border-r border-slate-300 font-semibold">{u.ot150} h</td>
-                          <td className="p-3 text-right border-r border-slate-300 text-slate-700">{(u.hourlyRate * 1.5).toFixed(2)} DH</td>
+                          <td className="p-3 text-right border-r border-slate-300 text-slate-700">{(u.hourlyRate * 1.5).toFixed(2)} {currency}</td>
                           <td className="p-3 text-right font-black text-blue-700">
-                            {(u.ot150 * u.hourlyRate * 1.5).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                            {(u.ot150 * u.hourlyRate * 1.5).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                           </td>
                         </tr>
                       )}
@@ -1739,16 +1737,16 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                         <tr>
                           <td className="p-3 font-bold text-purple-700 border-r border-slate-300">Heures Supplémentaires 200%</td>
                           <td className="p-3 text-center border-r border-slate-300 font-semibold">{u.ot200} h</td>
-                          <td className="p-3 text-right border-r border-slate-300 text-slate-700">{(u.hourlyRate * 2.0).toFixed(2)} DH</td>
+                          <td className="p-3 text-right border-r border-slate-300 text-slate-700">{(u.hourlyRate * 2.0).toFixed(2)} {currency}</td>
                           <td className="p-3 text-right font-black text-purple-700">
-                            {(u.ot200 * u.hourlyRate * 2.0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                            {(u.ot200 * u.hourlyRate * 2.0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                           </td>
                         </tr>
                       )}
                       <tr className="bg-slate-100 font-black border-t-2 border-slate-300">
                         <td colSpan={3} className="p-3 text-slate-900 border-r border-slate-300">TOTAL SALAIRE BRUT GAGNÉ</td>
                         <td className="p-3 text-right text-slate-900 text-sm">
-                          {u.earnedSalary.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                          {u.earnedSalary.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                         </td>
                       </tr>
                     </tbody>
@@ -1759,22 +1757,22 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                     <div className="p-4 bg-slate-100 border border-slate-300 rounded-xl space-y-2 text-xs">
                       <div className="flex justify-between text-slate-700">
                         <span>Primes & Gratifications:</span>
-                        <span className="font-black text-emerald-700">+{u.bonuses.toFixed(2)} DH</span>
+                        <span className="font-black text-emerald-700">+{u.bonuses.toFixed(2)} {currency}</span>
                       </div>
                       <div className="flex justify-between text-slate-700">
                         <span>Retenues & Pénalités:</span>
-                        <span className="font-black text-rose-700">-{u.deductions.toFixed(2)} DH</span>
+                        <span className="font-black text-rose-700">-{u.deductions.toFixed(2)} {currency}</span>
                       </div>
                       <div className="flex justify-between text-slate-700">
                         <span>Avances sur Salaire Perçues:</span>
-                        <span className="font-black text-amber-700">-{u.advances.toFixed(2)} DH</span>
+                        <span className="font-black text-amber-700">-{u.advances.toFixed(2)} {currency}</span>
                       </div>
                     </div>
 
                     <div className="p-4 bg-blue-50 border-2 border-blue-600 rounded-xl flex flex-col justify-center items-end text-right">
                       <span className="text-xs font-black text-blue-950 uppercase tracking-wider">NET À PAYER</span>
                       <span className="text-3xl font-black text-blue-700 mt-1">
-                        {u.netPayable.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                        {u.netPayable.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                       </span>
                     </div>
                   </div>
@@ -1834,7 +1832,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                     <th className="p-3 border-r border-slate-300 text-center">Mode</th>
                     <th className="p-3 border-r border-slate-300 text-right">Salaire Brut</th>
                     <th className="p-3 border-r border-slate-300 text-right text-rose-700">Avances / Ret.</th>
-                    <th className="p-3 text-right text-emerald-800 font-black">NET À REGLER (DH)</th>
+                    <th className="p-3 text-right text-emerald-800 font-black">NET À REGLER ({currency})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-300">
@@ -1852,13 +1850,13 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                         </span>
                       </td>
                       <td className="p-3 text-right border-r border-slate-300 font-medium">
-                        {u.earnedSalary.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                        {u.earnedSalary.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                       </td>
                       <td className="p-3 text-right border-r border-slate-300 font-medium text-rose-700">
-                        -{(u.advances + u.deductions).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                        -{(u.advances + u.deductions).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                       </td>
                       <td className="p-3 text-right font-black text-emerald-700 text-sm">
-                        {u.netPayable.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                        {u.netPayable.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                       </td>
                     </tr>
                   ))}
@@ -1867,7 +1865,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                       TOTAL GLOBAL À PAYER :
                     </td>
                     <td className="p-4 text-right text-emerald-800 text-base">
-                      {payslipUsers.reduce((sum, u) => sum + Math.max(0, u.netPayable), 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                      {payslipUsers.reduce((sum, u) => sum + Math.max(0, u.netPayable), 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                     </td>
                   </tr>
                 </tbody>
@@ -1906,11 +1904,11 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
               <div className="bg-surface/60 p-3.5 rounded-xl border border-border space-y-1">
                 <p className="text-xs font-semibold text-foreground/60">EMPLOYÉ BÉNÉFICIAIRE</p>
                 <p className="text-sm font-bold text-foreground">{adjustUser.lastName.toUpperCase()} {adjustUser.firstName}</p>
-                <p className="text-xs text-foreground/50">Solde Calculé Actuel (ZKTeco): <span className="font-bold text-foreground">{adjustUser.netPayable.toFixed(2)} DH</span></p>
+                <p className="text-xs text-foreground/50">Solde Calculé Actuel (ZKTeco): <span className="font-bold text-foreground">{adjustUser.netPayable.toFixed(2)} {currency}</span></p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-foreground/70 mb-1">Montant Net Souhaité à Verser (DH)</label>
+                <label className="block text-xs font-semibold text-foreground/70 mb-1">Montant Net Souhaité à Verser ({currency})</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1930,14 +1928,14 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                     onClick={() => setTargetNetInput((Math.ceil(adjustUser.netPayable / 10) * 10).toString())}
                     className="px-2.5 py-1 bg-surface hover:bg-surface-hover border border-border rounded-lg text-xs font-semibold text-primary cursor-pointer"
                   >
-                    Arrondir à {Math.ceil(adjustUser.netPayable / 10) * 10} DH
+                    Arrondir à {Math.ceil(adjustUser.netPayable / 10) * 10} {currency}
                   </button>
                   <button
                     type="button"
                     onClick={() => setTargetNetInput((Math.ceil(adjustUser.netPayable / 50) * 50).toString())}
                     className="px-2.5 py-1 bg-surface hover:bg-surface-hover border border-border rounded-lg text-xs font-semibold text-purple-500 cursor-pointer"
                   >
-                    Arrondir à {Math.ceil(adjustUser.netPayable / 50) * 50} DH
+                    Arrondir à {Math.ceil(adjustUser.netPayable / 50) * 50} {currency}
                   </button>
                 </div>
               </div>
@@ -1949,7 +1947,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                 if (Math.abs(diff) >= 0.01) {
                   return (
                     <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-500 space-y-1">
-                      <p className="font-bold">💡 Ajustement / Arrondi détecté: {diff > 0 ? `+${diff.toFixed(2)} DH` : `${diff.toFixed(2)} DH`}</p>
+                      <p className="font-bold">💡 Ajustement / Arrondi détecté: {diff > 0 ? `+${diff.toFixed(2)} ${currency}` : `${diff.toFixed(2)} ${currency}`}</p>
                       <p className="text-[11px] opacity-80">Cette différence sera enregistrée comme prime/arrondi et figurera clairement sur la fiche de paie.</p>
                     </div>
                   );
@@ -2008,7 +2006,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                     {data
                       .filter(u => selectedUserIds.includes(u.userId))
                       .reduce((sum, u) => sum + Math.max(0, u.netPayable), 0)
-                      .toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                      .toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                   </span>
                 </div>
               </div>

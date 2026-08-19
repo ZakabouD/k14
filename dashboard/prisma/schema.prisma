@@ -159,7 +159,7 @@ model SystemSettings {
   otRate1           Float     @default(1.5)
   otRate2           Float     @default(2.0)
   adminEmail        String    @default("admin@example.com")
-  adminPasswordHash String    @default("$2b$10$w0d3a7WjS1s1W5mYV7w5e.kG4e8z5x5w5e5x5w5e5x5w5e5x5w5e5")
+  adminPasswordHash String
   contractTypes     String    @default("[]")
   maritalStatuses   String    @default("[]")
   leaveTypes        String    @default("[]")

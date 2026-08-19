@@ -19,10 +19,11 @@ export default async function ArtisansPage() {
   const shifts = await prisma.shift.findMany();
 
   const settings = await prisma.systemSettings.findFirst({
-    select: { contractTypes: true, maritalStatuses: true }
+    select: { contractTypes: true, maritalStatuses: true, currency: true }
   });
   const contractTypesList = parseContractTypes(settings?.contractTypes || "");
   const maritalStatusesList = parseMaritalStatuses(settings?.maritalStatuses || "");
+  const currency = settings?.currency || "DH";
 
   const canViewSalaries = session.adminId === "admin" || session.permissions?.canViewSalaries === true;
 
@@ -33,6 +34,7 @@ export default async function ArtisansPage() {
       contractTypesList={contractTypesList}
       maritalStatusesList={maritalStatusesList}
       canViewSalaries={canViewSalaries}
+      currency={currency}
     />
   );
 }

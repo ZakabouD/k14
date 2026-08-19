@@ -109,9 +109,11 @@ export default function DashboardClient({ initialData, canViewSalaries }: Dashbo
   // Max cost in chart for scaling bars
   const maxChartCost = Math.max(...chartDays.map((d: any) => d.cost), 1);
 
+  const currency = data?.currency || "DH";
+
   // Compact number formatting for chart labels to prevent overflow
   const formatBarValue = (cost: number, numDays: number) => {
-    if (numDays <= 7) return `${cost} DH`;
+    if (numDays <= 7) return `${cost} ${currency}`;
     if (cost >= 1000) return `${(cost / 1000).toFixed(1)}k`;
     return Math.round(cost).toString();
   };
@@ -320,7 +322,7 @@ export default function DashboardClient({ initialData, canViewSalaries }: Dashbo
           <div className="flex items-baseline gap-2">
             {canViewSalaries ? (
               <span className="text-3xl font-black text-foreground">
-                {kpis.estimatedPayrollCost?.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} DH
+                {kpis.estimatedPayrollCost?.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} {currency}
               </span>
             ) : (
               <span className="text-sm font-semibold text-foreground/40 italic">Réservé Admin</span>
@@ -508,7 +510,7 @@ export default function DashboardClient({ initialData, canViewSalaries }: Dashbo
                 <div className="pt-3 border-t border-border/60 flex items-center justify-between mt-3 text-xs">
                   <div className="font-bold text-foreground">
                     <span>{e.totalHours}h travaillées</span>
-                    {canViewSalaries && <span className="block text-[10px] text-primary font-bold">{e.earnedCost} DH</span>}
+                    {canViewSalaries && <span className="block text-[10px] text-primary font-bold">{e.earnedCost} {currency}</span>}
                   </div>
 
                   <Link
@@ -537,7 +539,7 @@ export default function DashboardClient({ initialData, canViewSalaries }: Dashbo
 
           <div className="flex items-center gap-4 text-xs font-semibold text-foreground/70">
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-primary" /> Coût (DH)
+              <span className="w-3 h-3 rounded-sm bg-primary" /> Coût ({currency})
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-border/40" /> Plage Sans Pointage
@@ -557,7 +559,7 @@ export default function DashboardClient({ initialData, canViewSalaries }: Dashbo
                 {/* TOOLTIP ON HOVER - Positioned inside container with high z-index and zero clipping */}
                 <div className="absolute -top-14 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center bg-foreground text-background text-[11px] font-extrabold py-1.5 px-3 rounded-xl shadow-2xl z-50 whitespace-nowrap pointer-events-none border border-background/20">
                   <span>📅 Date: {d.label}</span>
-                  <span className="text-primary-foreground font-black">💰 Coût: {d.cost.toLocaleString("fr-FR")} DH</span>
+                  <span className="text-primary-foreground font-black">💰 Coût: {d.cost.toLocaleString("fr-FR")} {currency}</span>
                   <span className="text-foreground/70 font-semibold">⏱️ Heures: {d.hours} h</span>
                 </div>
 
@@ -631,7 +633,7 @@ export default function DashboardClient({ initialData, canViewSalaries }: Dashbo
                 <th className="py-3 px-3 text-right">H. Normales</th>
                 <th className="py-3 px-3 text-right">H. Sup 150%</th>
                 <th className="py-3 px-3 text-right">H. Sup 200%</th>
-                {canViewSalaries && <th className="py-3 px-3 text-right">Coût Est. (DH)</th>}
+                {canViewSalaries && <th className="py-3 px-3 text-right">Coût Est. ({currency})</th>}
                 <th className="py-3 px-3 text-center">Statut Période</th>
               </tr>
             </thead>
@@ -679,7 +681,7 @@ export default function DashboardClient({ initialData, canViewSalaries }: Dashbo
 
                   {canViewSalaries && (
                     <td className="py-3 px-3 text-right font-black text-foreground">
-                      {e.earnedCost.toFixed(2)} DH
+                      {e.earnedCost.toFixed(2)} {currency}
                     </td>
                   )}
 

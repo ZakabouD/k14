@@ -46,13 +46,20 @@ export default async function LeavesPage() {
   });
 
   const settings = await prisma.systemSettings.findFirst({
-    select: { leaveTypes: true }
+    select: { leaveTypes: true, currency: true }
   });
   const leaveTypesList = parseLeaveTypes(settings?.leaveTypes || "");
+  const currency = settings?.currency || "DH";
 
   return (
     <div className="container mx-auto">
-      <LeavesClient initialLeaves={leaves} artisans={artisans} leaveTypesList={leaveTypesList} canViewSalaries={canViewSalaries} />
+      <LeavesClient
+        initialLeaves={leaves}
+        artisans={artisans}
+        leaveTypesList={leaveTypesList}
+        canViewSalaries={canViewSalaries}
+        currency={currency}
+      />
     </div>
   );
 }

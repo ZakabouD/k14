@@ -2,7 +2,13 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
 function getSecretKey() {
-  const secret = process.env.JWT_SECRET || "default_development_secret_key_for_build_purposes";
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.trim().length === 0) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("CRITICAL SECURITY ERROR: JWT_SECRET environment variable is missing in production. Session tokens cannot be safely signed or verified.");
+    }
+    return new TextEncoder().encode("insecure_development_only_jwt_secret_do_not_use_in_production");
+  }
   return new TextEncoder().encode(secret);
 }
 

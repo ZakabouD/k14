@@ -69,12 +69,14 @@ const DailyTimelineChart = ({
   data, 
   rate1Percent, 
   rate2Percent,
-  canViewSalaries
+  canViewSalaries,
+  currency = "DH"
 }: { 
   data: any[], 
   rate1Percent: number, 
   rate2Percent: number,
-  canViewSalaries: boolean
+  canViewSalaries: boolean,
+  currency?: string
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -125,7 +127,7 @@ const DailyTimelineChart = ({
             <span className="font-bold text-foreground">{hoveredDay.dayName} {hoveredDay.date}</span>
             <span className="text-primary font-bold">{hoveredDay.totalHours.toFixed(2)}h total</span>
             {canViewSalaries && (
-              <span className="text-success font-extrabold">{hoveredDay.cost.toFixed(2)} DH</span>
+              <span className="text-success font-extrabold">{hoveredDay.cost.toFixed(2)} {currency}</span>
             )}
           </div>
         )}
@@ -340,6 +342,7 @@ export default function ReportsClient({
   settings: any, 
   canViewSalaries?: boolean 
 }) {
+  const currency = settings?.currency || "DH";
   const rate1Percent = settings ? Math.round(settings.otRate1 * 100) : 150;
   const rate2Percent = settings ? Math.round(settings.otRate2 * 100) : 200;
 
@@ -655,7 +658,7 @@ export default function ReportsClient({
                           {canViewSalaries && (
                             <span className="flex items-center gap-1 text-success font-semibold">
                               <DollarSign className="w-3.5 h-3.5" />
-                              Taux : {selectedUser.hourlyRate ? `${selectedUser.hourlyRate} DH/h` : 'Non défini'}
+                              Taux : {selectedUser.hourlyRate ? `${selectedUser.hourlyRate} ${currency}/h` : 'Non défini'}
                             </span>
                           )}
                         </div>
@@ -711,7 +714,7 @@ export default function ReportsClient({
                       <div className="glass-panel p-4 bg-success/5 border-success/30">
                         <p className="text-xs font-semibold text-success uppercase tracking-wider mb-1">Salaire Période</p>
                         <p className="text-xl font-bold text-success">
-                          {selectedUser.totalCost.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                          {selectedUser.totalCost.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                         </p>
                       </div>
                     )}
@@ -742,7 +745,7 @@ export default function ReportsClient({
                     <div className="glass-panel p-5 border-success/30 bg-success/5">
                       <p className="text-xs font-semibold text-success uppercase tracking-wider mb-1">Masse Salariale (Période)</p>
                       <p className="text-2xl font-bold text-success">
-                        {totalCostVal.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                        {totalCostVal.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                       </p>
                     </div>
                   )}
@@ -775,6 +778,7 @@ export default function ReportsClient({
                     rate1Percent={rate1Percent} 
                     rate2Percent={rate2Percent}
                     canViewSalaries={canViewSalaries}
+                    currency={currency}
                   />
                 </div>
               )}
@@ -846,7 +850,7 @@ export default function ReportsClient({
                           <th className="p-4 font-bold text-right text-purple-500">Sup. {rate2Percent}%</th>
                           <th className="p-4 font-bold text-right text-primary">Total Jour</th>
                           {canViewSalaries && (
-                            <th className="p-4 font-bold text-right text-success">Coût (DH)</th>
+                            <th className="p-4 font-bold text-right text-success">Coût ({currency})</th>
                           )}
                           <th className="p-4 font-bold text-center">Statut</th>
                         </tr>
@@ -909,7 +913,7 @@ export default function ReportsClient({
                               <td className="p-4 text-right font-bold text-primary">{day.totalHours.toFixed(2)}</td>
                               {canViewSalaries && (
                                 <td className="p-4 text-right font-extrabold text-success whitespace-nowrap">
-                                  {day.cost > 0 ? `${day.cost.toFixed(2)} DH` : '-'}
+                                  {day.cost > 0 ? `${day.cost.toFixed(2)} ${currency}` : '-'}
                                 </td>
                               )}
                               <td className="p-4 text-center whitespace-nowrap">
@@ -983,7 +987,7 @@ export default function ReportsClient({
                           <th className="p-4 font-bold text-right text-purple-500">Heures Sup. {rate2Percent}%</th>
                           <th className="p-4 font-bold text-right text-primary">Total Général</th>
                           {canViewSalaries && (
-                            <th className="p-4 font-bold text-right text-success">Coût Est. (DH)</th>
+                            <th className="p-4 font-bold text-right text-success">Coût Est. ({currency})</th>
                           )}
                         </tr>
                       </thead>
@@ -1029,7 +1033,7 @@ export default function ReportsClient({
                                 {canViewSalaries && (
                                   <td className="p-4 text-right">
                                     <span className="font-extrabold text-success bg-success/10 border border-success/20 px-2.5 py-1 rounded-md text-sm shadow-sm inline-block whitespace-nowrap">
-                                      {(row.totalCost || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                                      {(row.totalCost || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                                     </span>
                                   </td>
                                 )}
@@ -1056,7 +1060,7 @@ export default function ReportsClient({
                                               <th className="py-2 text-right font-semibold text-purple-500">OT {rate2Percent}%</th>
                                               <th className="py-2 text-right font-semibold text-primary">Total</th>
                                               {canViewSalaries && (
-                                                <th className="py-2 text-right font-semibold text-success">Coût (DH)</th>
+                                                <th className="py-2 text-right font-semibold text-success">Coût ({currency})</th>
                                               )}
                                               <th className="py-2 text-center font-semibold">Statut</th>
                                             </tr>
@@ -1086,7 +1090,7 @@ export default function ReportsClient({
                                                 <td className="py-2 text-right font-bold text-primary">{d.totalHours.toFixed(2)}</td>
                                                 {canViewSalaries && (
                                                   <td className="py-2 text-right font-bold text-success">
-                                                    {d.cost > 0 ? `${d.cost.toFixed(2)} DH` : '-'}
+                                                    {d.cost > 0 ? `${d.cost.toFixed(2)} ${currency}` : '-'}
                                                   </td>
                                                 )}
                                                 <td className="py-2 text-center">

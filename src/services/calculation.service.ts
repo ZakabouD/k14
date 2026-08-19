@@ -118,7 +118,8 @@ export class CalculationService {
     // Basic Anomaly Checks
     let anomaly = anomalyService.detectAnomalies(punches);
     
-    const settings = await prisma.systemSettings.findFirst({ select: { gracePeriod: true } });
+    const settings = await prisma.systemSettings.findFirst({ select: { gracePeriod: true, timezone: true } });
+    const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
     const gracePeriod = user.shift ? user.shift.gracePeriod : (settings?.gracePeriod ?? 15);
 
     let firstPunchIn = punches.length > 0 ? punches[0]!.recordTime : null;
@@ -136,7 +137,7 @@ export class CalculationService {
     }
 
     if (firstPunchIn && user.shift) {
-      const moroccoPunchStr = firstPunchIn.toLocaleString("en-US", { timeZone: process.env.TIMEZONE || "Africa/Casablanca" });
+      const moroccoPunchStr = firstPunchIn.toLocaleString("en-US", { timeZone: timezone });
       const localPunch = new Date(moroccoPunchStr);
       const punchMinutes = localPunch.getHours() * 60 + localPunch.getMinutes();
       
@@ -176,7 +177,7 @@ export class CalculationService {
     let anomalyReason = anomaly.reason;
 
     // If the report date is today and they have an odd number of punches, it is not an anomaly (they are currently working)
-    const moroccoTodayStr = new Date().toLocaleString("en-US", { timeZone: process.env.TIMEZONE || "Africa/Casablanca" });
+    const moroccoTodayStr = new Date().toLocaleString("en-US", { timeZone: timezone });
     const localToday = new Date(moroccoTodayStr);
     const utcToday = new Date(Date.UTC(localToday.getFullYear(), localToday.getMonth(), localToday.getDate()));
     const isReportToday = startOfDay.getTime() === utcToday.getTime();
