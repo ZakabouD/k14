@@ -8,9 +8,9 @@ import { prisma } from '../config/database';
 
 const pullFromZKTeco = async (): Promise<{ records: ZKTecoRecord[], users: ZKTecoUser[] }> => {
   const settings = await prisma.systemSettings.findFirst();
-  const deviceIp = settings?.deviceIp || '192.168.11.201';
-  const devicePort = settings?.devicePort || 4370;
-  const deviceTimeout = settings?.deviceTimeout || 15000;
+  const deviceIp = process.env.ZKTECO_IP || settings?.deviceIp || "192.168.1.201";
+  const devicePort = process.env.ZKTECO_PORT ? parseInt(process.env.ZKTECO_PORT, 10) : (settings?.devicePort || 4370);
+  const deviceTimeout = process.env.ZKTECO_TIMEOUT ? parseInt(process.env.ZKTECO_TIMEOUT, 10) : (settings?.deviceTimeout || 10000);
 
   const device = new Zkteco(deviceIp, devicePort, deviceTimeout, 4000);
   try {

@@ -19,25 +19,25 @@ model User {
   shiftId String?
   shift   Shift?  @relation(fields: [shiftId], references: [id])
 
-  hourlyRate   Float     @default(0.0)
-  phone        String?
-  cin          String?
-  cnss         String?
-  hireDate     DateTime?
-  exitDate     DateTime?
-  exitReason   String?
-  monthlySalary Float     @default(0.0)
-  paymentFrequency String  @default("MONTHLY")
-  contractType  String?
-  bankName      String?
-  rib           String?
-  maritalStatus String?
-  childrenCount Int       @default(0)
-  address       String?
+  hourlyRate       Float     @default(0.0)
+  phone            String?
+  cin              String?
+  cnss             String?
+  hireDate         DateTime?
+  exitDate         DateTime?
+  exitReason       String?
+  monthlySalary    Float     @default(0.0)
+  paymentFrequency String    @default("MONTHLY")
+  contractType     String?
+  bankName         String?
+  rib              String?
+  maritalStatus    String?
+  childrenCount    Int       @default(0)
+  address          String?
 
-  rawPunches   RawPunch[]
-  dailyReports CalculatedDailyReport[]
-  leaves       Leave[]
+  rawPunches         RawPunch[]
+  dailyReports       CalculatedDailyReport[]
+  leaves             Leave[]
   salaryTransactions SalaryTransaction[]
 
   createdAt DateTime @default(now())
@@ -45,14 +45,14 @@ model User {
 }
 
 model Shift {
-  id            String @id @default(uuid())
-  name          String // e.g., "Standard 8-Hour"
-  startTime     String // e.g., "08:00"
-  endTime       String // e.g., "17:00"
-  baseHours     Float  // e.g., 8.0
-  lunchBreak    Int    @default(0)
-  gracePeriod   Int    @default(15)
-  saturdayHours Float  @default(4.0)
+  id            String  @id @default(uuid())
+  name          String  // e.g., "Standard 8-Hour"
+  startTime     String  // e.g., "08:00"
+  endTime       String  // e.g., "17:00"
+  baseHours     Float   // e.g., 8.0
+  lunchBreak    Int     @default(0)
+  gracePeriod   Int     @default(15)
+  saturdayHours Float   @default(4.0)
   autoClose     Boolean @default(false)
 
   users User[]
@@ -60,12 +60,12 @@ model Shift {
 
 model RawPunch {
   id           String   @id @default(uuid())
-  sn           Int // Serial number from device
-  zktecoUserId String // 'user_id' from device
+  sn           Int      // Serial number from device
+  zktecoUserId String   // 'user_id' from device
   recordTime   DateTime // Parsed ISO date from 'record_time'
-  type         Int // Check-in, check-out, etc.
+  type         Int      // Check-in, check-out, etc.
   state        Int
-  ip           String // IP of the emitting device
+  ip           String   // IP of the emitting device
 
   user User @relation(fields: [zktecoUserId], references: [zktecoUserId])
 
@@ -75,140 +75,111 @@ model RawPunch {
 }
 
 model CalculatedDailyReport {
-  id     String   @id @default(uuid())
-  userId String
-  date   DateTime @db.Date // The specific working day
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  date             DateTime
+  firstPunchIn     DateTime?
+  lastPunchOut     DateTime?
+  regularHours     Float     @default(0)
+  overtime150Hours Float     @default(0)
+  overtime200Hours Float     @default(0)
+  status           String    @default("OK") // OK, ANOMALY, PENDING, RESOLVED, LEAVE, HOLIDAY, REST, ABSENT
+  anomalyReason    String?
 
-  firstPunchIn DateTime?
-  lastPunchOut DateTime?
-
-  regularHours     Float @default(0)
-  overtime150Hours Float @default(0)
-  overtime200Hours Float @default(0)
-
-  status        ReportStatus @default(PENDING)
-  anomalyReason String? // e.g., "Missing Check-out"
-
-  user User @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, date])
 }
 
-enum ReportStatus {
-  OK
-  ANOMALY
-  PENDING
-  RESOLVED
-  LEAVE
-  HOLIDAY
-}
-
-model SystemSettings {
-  id                String   @id @default("singleton")
-  adminEmail        String   @unique
-  adminPasswordHash String
-  deviceIp          String   @default("192.168.11.201")
-  devicePort        Int      @default(4370)
-  deviceTimeout     Int      @default(15000)
-  syncRequested     Boolean  @default(false)
-  syncStatus        String   @default("IDLE") // IDLE, PENDING, RUNNING, SUCCESS, ERROR
-  syncError         String?
-  lastHeartbeat     DateTime?
-  deviceOnline      Boolean  @default(false)
-  otThresholdLimit  Float    @default(2.0)
-  otRate1           Float    @default(1.5)
-  otRate2           Float    @default(2.0)
-  contractTypes     String   @default("CDI,CDD,Intérim,ANAPEC,Autre")
-  maritalStatuses   String   @default("Célibataire,Marié(e),Divorcé(e),Veuf(ve)")
-  leaveTypes        String   @default("Congé Payé,Maladie,RTT,Congé Sans Solde,Récupération")
-  gracePeriod       Int      @default(15)
-
-  updatedAt DateTime @updatedAt
-}
-
 model Leave {
-  id        String      @id @default(uuid())
+  id        String   @id @default(uuid())
   userId    String
-  user      User        @relation(fields: [userId], references: [id])
-  startDate DateTime    @db.Date
-  endDate   DateTime    @db.Date
-  type      String
-  status    LeaveStatus @default(APPROVED)
+  user      User     @relation(fields: [userId], references: [id])
+  startDate DateTime
+  endDate   DateTime
+  type      String   @default("Congé Payé") // Congé Payé, Unpaid, Sick, etc.
+  status    String   @default("APPROVED") // PENDING, APPROVED, REJECTED
   comment   String?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, startDate, endDate])
 }
 
-enum LeaveType {
-  CONGE_PAYE
-  MALADIE
-  RTT
-  SANS_SOLDE
-  RECUPERATION
-}
-
-enum LeaveStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 model Holiday {
   id   String   @id @default(uuid())
-  date DateTime @unique @db.Date
   name String
-}
+  date DateTime @unique
 
-model DashboardUser {
-  id                  String   @id @default(uuid())
-  email               String   @unique
-  passwordHash        String
-  name                String
-  role                String   @default("MANAGER") // SUPERADMIN, ADMIN, MANAGER
-  
-  // Specific switches
-  canManagePersonnel  Boolean  @default(false)
-  canManageShifts     Boolean  @default(false)
-  canManageLeaves     Boolean  @default(false)
-  canViewSalaries     Boolean  @default(false)
-  canManageSettings   Boolean  @default(false)
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-}
-
-enum TransactionType {
-  ADVANCE
-  ACOMPTE
-  BONUS
-  DEDUCTION
-  FINAL_PAY
-}
-
-enum PaymentMethod {
-  CASH
-  BANK_TRANSFER
-  CHECK
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SalaryTransaction {
-  id              String          @id @default(uuid())
+  id              String    @id @default(uuid())
   userId          String
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type            TransactionType @default(ADVANCE)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            String    // ADVANCE, ACOMPTE, BONUS, DEDUCTION, FINAL_PAY
   amount          Float
-  date            DateTime        @default(now())
+  date            DateTime  @default(now())
   periodDate      DateTime?
   periodStartDate DateTime?
   periodEndDate   DateTime?
-  method          PaymentMethod   @default(CASH)
-  reference       String?
+  method          String    @default("CASH") // CASH, BANK_TRANSFER, CHECK
+  reference       String?   // Check #, transfer ref, etc.
   notes           String?
-  createdBy       String?
+  createdBy       String?   // Admin who registered it
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
+model SystemSettings {
+  id                String    @id @default("singleton")
+  companyName       String    @default("Mon Entreprise")
+  companyAddress    String?
+  companyPhone      String?
+  companyEmail      String?
+  logoUrl           String?
+  currency          String    @default("DH")
+  timezone          String    @default("Africa/Casablanca")
+  deviceIp          String    @default("192.168.1.201")
+  devicePort        Int       @default(4370)
+  deviceTimeout     Int       @default(10000)
+  syncRequested     Boolean   @default(false)
+  syncStatus        String    @default("IDLE") // IDLE, PENDING, RUNNING, SUCCESS, ERROR
+  syncError         String?
+  lastHeartbeat     DateTime?
+  deviceOnline      Boolean   @default(false)
+  gracePeriod       Int       @default(15)
+  otThresholdLimit  Float     @default(2.0)
+  otRate1           Float     @default(1.5)
+  otRate2           Float     @default(2.0)
+  adminEmail        String    @default("admin@example.com")
+  adminPasswordHash String    @default("$2b$10$w0d3a7WjS1s1W5mYV7w5e.kG4e8z5x5w5e5x5w5e5x5w5e5x5w5e5")
+  contractTypes     String    @default("[]")
+  maritalStatuses   String    @default("[]")
+  leaveTypes        String    @default("[]")
+
+  updatedAt DateTime @updatedAt
+}
+
+model DashboardUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("ADMIN") // SUPERADMIN, ADMIN, MANAGER, HR, VIEWER
+
+  canManagePersonnel Boolean @default(true)
+  canManageShifts    Boolean @default(true)
+  canManageLeaves    Boolean @default(true)
+  canViewSalaries    Boolean @default(true)
+  canManageSettings  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

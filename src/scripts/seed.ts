@@ -7,9 +7,14 @@ async function main() {
   const existingSettings = await prisma.systemSettings.findFirst();
 
   if (!existingSettings) {
-    // Generate a strong, secure random password if none is provided via the environment
     const envPassword = process.env.ADMIN_PASSWORD;
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@ecutsolutions.com";
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
+    const companyName = process.env.COMPANY_NAME || "Mon Entreprise";
+    const currency = process.env.DEFAULT_CURRENCY || "DH";
+    const timezone = process.env.TIMEZONE || "Africa/Casablanca";
+    const deviceIp = process.env.ZKTECO_IP || "192.168.1.201";
+    const devicePort = process.env.ZKTECO_PORT ? parseInt(process.env.ZKTECO_PORT, 10) : 4370;
+    const deviceTimeout = process.env.ZKTECO_TIMEOUT ? parseInt(process.env.ZKTECO_TIMEOUT, 10) : 10000;
     
     let passwordToUse: string = envPassword || "";
     let isGenerated = false;
@@ -25,16 +30,20 @@ async function main() {
     await prisma.systemSettings.create({
       data: {
         id: "singleton",
-        adminEmail: adminEmail,
+        companyName,
+        currency,
+        timezone,
+        adminEmail,
         adminPasswordHash: hashedPassword,
-        deviceIp: "192.168.11.201",
-        devicePort: 4370,
-        deviceTimeout: 15000,
+        deviceIp,
+        devicePort,
+        deviceTimeout,
       }
     });
 
     console.log("------------------------------------------------------------");
     console.log("Created System Settings successfully!");
+    console.log(`Company Name: ${companyName}`);
     console.log(`Admin Email: ${adminEmail}`);
     if (isGenerated) {
       console.log(`Generated Secure Admin Password: ${passwordToUse}`);

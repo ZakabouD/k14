@@ -35,22 +35,47 @@ function checkDeviceReachable(ip: string, port: number, timeoutMs = 2000): Promi
   });
 }
 
-const DEVICE_IP = '192.168.11.201';
-const DEVICE_PORT = 4370;
-const DEVICE_TIMEOUT = 10000; // 10 seconds timeout
+const getDeviceConfig = async () => {
+  const envIp = process.env.ZKTECO_IP;
+  const envPort = process.env.ZKTECO_PORT ? parseInt(process.env.ZKTECO_PORT, 10) : undefined;
+  const envTimeout = process.env.ZKTECO_TIMEOUT ? parseInt(process.env.ZKTECO_TIMEOUT, 10) : undefined;
+
+  let dbIp: string | undefined;
+  let dbPort: number | undefined;
+  let dbTimeout: number | undefined;
+
+  try {
+    const settings = await prisma.systemSettings.findFirst({
+      select: { deviceIp: true, devicePort: true, deviceTimeout: true }
+    });
+    if (settings) {
+      dbIp = settings.deviceIp;
+      dbPort = settings.devicePort;
+      dbTimeout = settings.deviceTimeout;
+    }
+  } catch (e) {}
+
+  return {
+    ip: envIp || dbIp || "192.168.1.201",
+    port: envPort || dbPort || 4370,
+    timeout: envTimeout || dbTimeout || 10000
+  };
+};
+
 const MAX_CONNECTION_RETRIES = 3;
 
 const pullFromZKTecoWithRetry = async (
   retries = MAX_CONNECTION_RETRIES
 ): Promise<{ records: ZKTecoRecord[]; users: ZKTecoUser[] }> => {
-  const device = new Zkteco(DEVICE_IP, DEVICE_PORT, DEVICE_TIMEOUT, 4000);
+  const { ip, port, timeout } = await getDeviceConfig();
+  const device = new Zkteco(ip, port, timeout, 4000);
   
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(`[ZKTeco] Connecting to K14 firmware at ${DEVICE_IP}:${DEVICE_PORT} (Attempt ${attempt}/${retries})...`);
+      console.log(`[ZKTeco] Connecting to terminal at ${ip}:${port} (Attempt ${attempt}/${retries})...`);
       await device.createSocket();
       
-      console.log('[ZKTeco] Fetching device users...');
+      console.log("[ZKTeco] Fetching device users...");
       const usersResponse = await device.getUsers();
       const usersArray = usersResponse.data ? usersResponse.data : [];
 
@@ -70,7 +95,7 @@ const pullFromZKTecoWithRetry = async (
     } catch (error) {
       console.error(`[ZKTeco] Connection attempt ${attempt} failed:`, error);
       if (attempt === retries) {
-        throw new Error(`Failed to connect to K14 biometric device after ${retries} attempts.`);
+        throw new Error(`Failed to connect to biometric device at ${ip}:${port} after ${retries} attempts.`);
       }
       // Wait before retrying (exponential backoff)
       await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
@@ -130,12 +155,7 @@ export class SyncWorker {
           if (now - this.lastDeviceCheckTime >= 20000) {
             this.lastDeviceCheckTime = now;
 
-            const settings = await prisma.systemSettings.findFirst({
-              select: { deviceIp: true, devicePort: true }
-            });
-            const ip = settings?.deviceIp || DEVICE_IP;
-            const port = settings?.devicePort || DEVICE_PORT;
-
+            const { ip, port } = await getDeviceConfig();
             this.isDeviceOnlineCached = await checkDeviceReachable(ip, port, 3000);
           }
 

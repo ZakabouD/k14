@@ -1,7 +1,7 @@
 const Zkteco = require('zkteco-js');
 
 async function run() {
-    const device = new Zkteco('192.168.11.201', 4370, 15000, 4000);
+    const device = new Zkteco('process.env.ZKTECO_IP || "192.168.1.201"', 4370, 15000, 4000);
 
     try {
         console.log('Connecting to K14 firmware...');

@@ -33,9 +33,13 @@ interface SalariesClientProps {
     totalBonuses: number;
     totalRemaining: number;
   };
+  initialCompanyName?: string;
+  initialCurrency?: string;
 }
 
-export default function SalariesClient({ initialMode, initialDate, initialLabel, initialData, initialKpis }: SalariesClientProps) {
+export default function SalariesClient({ initialMode, initialDate, initialLabel, initialData, initialKpis, initialCompanyName, initialCurrency }: SalariesClientProps) {
+  const companyName = initialCompanyName || "Mon Entreprise";
+  const currency = initialCurrency || "DH";
   const [periodMode, setPeriodMode] = useState<"MONTHLY" | "WEEKLY" | "CUSTOM">(
     (initialMode as "MONTHLY" | "WEEKLY" | "CUSTOM") || "MONTHLY"
   );
@@ -1405,7 +1409,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                 <div className="p-8 bg-white text-slate-900 rounded-2xl border border-slate-300 shadow-xl space-y-6 print:p-0 print:shadow-none">
                   <div className="flex justify-between items-start border-b border-slate-200 pb-4">
                     <div>
-                      <h3 className="text-xl font-black tracking-tight text-blue-900">e-Cut Solutions</h3>
+                      <h3 className="text-xl font-black tracking-tight text-blue-900">{companyName}</h3>
                       <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mt-0.5">Suivi d'Atelier & Paie</p>
                     </div>
                     <div className="text-right">
@@ -1671,7 +1675,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                   {/* Header */}
                   <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
                     <div>
-                      <h1 className="text-xl font-black text-slate-900 tracking-tight">E-CUT SOLUTIONS SUIVI D'ATELIER</h1>
+                      <h1 className="text-xl font-black text-slate-900 tracking-tight">{companyName.toUpperCase()} - SUIVI D'ATELIER</h1>
                       <p className="text-xs text-slate-600 font-bold mt-0.5">BULLETIN DE PAIE & FICHE INDIVIDUELLE</p>
                     </div>
                     <div className="text-right">
@@ -1811,7 +1815,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             <div className="space-y-6 p-4 bg-white">
               <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
                 <div>
-                  <h1 className="text-2xl font-black text-slate-900 tracking-tight">E-CUT SOLUTIONS SUIVI D'ATELIER</h1>
+                  <h1 className="text-2xl font-black text-slate-900 tracking-tight">{companyName.toUpperCase()} - SUIVI D'ATELIER</h1>
                   <p className="text-xs text-slate-600 font-semibold">ORDRE DE PAIEMENT & BORDEREAU DES SALAIRES</p>
                 </div>
                 <div className="text-right">

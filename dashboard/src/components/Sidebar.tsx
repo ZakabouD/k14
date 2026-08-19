@@ -28,6 +28,7 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [permissions, setPermissions] = useState<any>(null);
   const [userRole, setUserRole] = useState<string>("");
+  const [companyName, setCompanyName] = useState<string>("Mon Entreprise");
 
   useEffect(() => {
     const isLight = document.documentElement.classList.contains('light');
@@ -39,6 +40,7 @@ export function Sidebar() {
         if (sess) {
           setPermissions(sess.permissions);
           setUserRole(sess.role);
+          if (sess.companyName) setCompanyName(sess.companyName);
         }
       } catch (err) {
         console.error("Failed to load session in sidebar:", err);
@@ -84,10 +86,10 @@ export function Sidebar() {
       <header className="lg:hidden w-full h-16 fixed top-0 left-0 bg-background/80 backdrop-blur-md border-b border-border z-40 px-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center mr-2.5 shadow-[0_0_10px_var(--primary-glow)]">
-            <span className="font-bold text-white text-base">e</span>
+            <span className="font-bold text-white text-base">{companyName.charAt(0).toUpperCase()}</span>
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-xs tracking-tight text-foreground leading-tight">e-Cut Solutions</span>
+            <span className="font-bold text-xs tracking-tight text-foreground leading-tight truncate max-w-[140px]">{companyName}</span>
             <span className="text-primary font-semibold text-[9px] tracking-wider uppercase leading-none mt-0.5">Suivi d'Atelier</span>
           </div>
         </div>
@@ -113,10 +115,10 @@ export function Sidebar() {
       <div>
         <div className="h-20 flex items-center px-8 border-b border-border">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center mr-3 shadow-[0_0_15px_var(--primary-glow)]">
-            <span className="font-bold text-white text-lg">e</span>
+            <span className="font-bold text-white text-lg">{companyName.charAt(0).toUpperCase()}</span>
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-sm tracking-tight text-foreground leading-tight">e-Cut Solutions</span>
+            <span className="font-bold text-sm tracking-tight text-foreground leading-tight truncate max-w-[160px]">{companyName}</span>
             <span className="text-primary font-semibold text-[10px] tracking-wider uppercase leading-none mt-0.5">Suivi d'Atelier</span>
           </div>
         </div>

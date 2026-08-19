@@ -484,7 +484,7 @@ export default function UsersClient({
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full bg-background/80 border border-border rounded-xl pl-10 pr-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
-                        placeholder="Ex: omar@ecutsolutions.com"
+                        placeholder="Ex: manager@example.com"
                       />
                       <Mail className="w-4.5 h-4.5 text-foreground/45 absolute left-3.5 top-3.5" />
                     </div>

@@ -136,7 +136,7 @@ export class CalculationService {
     }
 
     if (firstPunchIn && user.shift) {
-      const moroccoPunchStr = firstPunchIn.toLocaleString("en-US", { timeZone: "Africa/Casablanca" });
+      const moroccoPunchStr = firstPunchIn.toLocaleString("en-US", { timeZone: process.env.TIMEZONE || "Africa/Casablanca" });
       const localPunch = new Date(moroccoPunchStr);
       const punchMinutes = localPunch.getHours() * 60 + localPunch.getMinutes();
       
@@ -176,7 +176,7 @@ export class CalculationService {
     let anomalyReason = anomaly.reason;
 
     // If the report date is today and they have an odd number of punches, it is not an anomaly (they are currently working)
-    const moroccoTodayStr = new Date().toLocaleString("en-US", { timeZone: "Africa/Casablanca" });
+    const moroccoTodayStr = new Date().toLocaleString("en-US", { timeZone: process.env.TIMEZONE || "Africa/Casablanca" });
     const localToday = new Date(moroccoTodayStr);
     const utcToday = new Date(Date.UTC(localToday.getFullYear(), localToday.getMonth(), localToday.getDate()));
     const isReportToday = startOfDay.getTime() === utcToday.getTime();

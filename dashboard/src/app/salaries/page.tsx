@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getSession } from "@/lib/session";
 import { getSalaryOverview } from "@/app/actions";
 import SalariesClient from "../../components/SalariesClient";
@@ -28,6 +30,8 @@ export default async function SalariesPage() {
       initialLabel={overview.periodLabel || ""}
       initialData={overview.data || []} 
       initialKpis={overview.kpis || { totalEarned: 0, totalAdvances: 0, totalBonuses: 0, totalRemaining: 0 }} 
+      initialCompanyName={overview.companyName}
+      initialCurrency={overview.currency}
     />
   );
 }

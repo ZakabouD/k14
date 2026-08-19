@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, Network, Database, Loader2, Clock } from "lucide-react";
+import { Settings as SettingsIcon, Network, Database, Loader2, Clock, Building2 } from "lucide-react";
 import { saveAllSystemSettings, getSystemStatus } from "@/app/actions";
 import { ContractTypeOption, MaritalStatusOption, LeaveTypeOption, parseContractTypes, parseMaritalStatuses, parseLeaveTypes } from "../lib/tags";
 
@@ -128,6 +128,88 @@ export default function SettingsClient({ initialSettings }: { initialSettings: a
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Unified Settings Form */}
         <form id="systemSettingsForm" onSubmit={handleAllSave} className="lg:col-span-2 space-y-6">
+          
+          {/* Company Identity & Localization Card */}
+          <div className="glass-panel p-6">
+            <h2 className="text-lg font-bold text-foreground mb-5 flex items-center gap-2 border-b border-border/50 pb-3">
+              <Building2 className="w-5 h-5 text-primary" />
+              Identité de l'Entreprise & Paramètres Régionaux
+            </h2>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/75 mb-1.5 uppercase tracking-wider">Nom de l'Entreprise</label>
+                  <input 
+                    name="companyName"
+                    required
+                    type="text" 
+                    defaultValue={initialSettings?.companyName || "Mon Entreprise"}
+                    placeholder="Ex: Mon Entreprise"
+                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:border-primary transition-colors text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/75 mb-1.5 uppercase tracking-wider">Devise Monétaire</label>
+                  <input 
+                    name="currency"
+                    required
+                    type="text" 
+                    defaultValue={initialSettings?.currency || "DH"}
+                    placeholder="Ex: DH, EUR, USD, DZD"
+                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:border-primary transition-colors text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/75 mb-1.5 uppercase tracking-wider">Fuseau Horaire (Timezone)</label>
+                  <input 
+                    name="timezone"
+                    required
+                    type="text" 
+                    defaultValue={initialSettings?.timezone || "Africa/Casablanca"}
+                    placeholder="Ex: Africa/Casablanca, Europe/Paris"
+                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:border-primary transition-colors text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/75 mb-1.5 uppercase tracking-wider">Email de Contact</label>
+                  <input 
+                    name="companyEmail"
+                    type="email" 
+                    defaultValue={initialSettings?.companyEmail || ""}
+                    placeholder="Ex: contact@entreprise.com"
+                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:border-primary transition-colors text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/75 mb-1.5 uppercase tracking-wider">Téléphone</label>
+                  <input 
+                    name="companyPhone"
+                    type="text" 
+                    defaultValue={initialSettings?.companyPhone || ""}
+                    placeholder="Ex: +212 5 22 00 00 00"
+                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:border-primary transition-colors text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/75 mb-1.5 uppercase tracking-wider">Adresse Physique</label>
+                  <input 
+                    name="companyAddress"
+                    type="text" 
+                    defaultValue={initialSettings?.companyAddress || ""}
+                    placeholder="Ex: Zone Industrielle, Lot 45"
+                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:border-primary transition-colors text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
           
           {/* ZKTeco Hardware Card */}
           <div className="glass-panel p-6">

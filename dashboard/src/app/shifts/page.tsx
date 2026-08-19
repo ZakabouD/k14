@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { Clock } from "lucide-react";
 import { ShiftModal } from "@/components/ShiftModal";

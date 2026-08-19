@@ -52,8 +52,11 @@ export async function GET(request: NextRequest) {
 
   // 4. Query settings
   const settings = await prisma.systemSettings.findFirst({
-    select: { otRate1: true, otRate2: true, contractTypes: true }
+    select: { otRate1: true, otRate2: true, contractTypes: true, currency: true, timezone: true, companyName: true }
   });
+  const currency = settings?.currency || process.env.DEFAULT_CURRENCY || "DH";
+  const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
+  const companyName = settings?.companyName || process.env.COMPANY_NAME || "Mon Entreprise";
   const rate1Percent = settings ? Math.round(settings.otRate1 * 100) : 150;
   const rate2Percent = settings ? Math.round(settings.otRate2 * 100) : 200;
   const otRate1 = settings?.otRate1 ?? 1.5;
@@ -200,7 +203,7 @@ export async function GET(request: NextRequest) {
       `Heures Sup. ${rate2Percent}% (Hrs)`, 
       "Total Heures"
     ];
-    if (canViewSalaries) csvHeaders.push("Coût Est. (DH)");
+    if (canViewSalaries) csvHeaders.push("Coût Est. (" + currency + ")");
 
     const csvRows = [csvHeaders.map(h => `"${h}"`).join(";")];
 
@@ -403,7 +406,7 @@ export async function GET(request: NextRequest) {
         cell.numFmt = "0.00";
       } else if (colNumber === 9) {
         cell.alignment = { horizontal: "right", vertical: "middle" };
-        cell.numFmt = "#,##0.00\" DH\"";
+        cell.numFmt = "#,##0.00 \"" + currency + "\"";
         cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: successColor } };
       }
     });
@@ -452,7 +455,7 @@ export async function GET(request: NextRequest) {
       cell.numFmt = "0.00";
     } else if (colNumber === 9) {
       cell.alignment = { horizontal: "right", vertical: "middle" };
-      cell.numFmt = "#,##0.00\" DH\"";
+      cell.numFmt = "#,##0.00 \"" + currency + "\"";
       cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: successColor } };
     }
   });
@@ -584,7 +587,7 @@ export async function GET(request: NextRequest) {
       const key = `${user.zktecoUserId}_${dStr}`;
       const dayPunches = punchesMap.get(key) || [];
       const punchTimes = dayPunches.map(p => 
-        new Date(p.recordTime).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Casablanca" })
+        new Date(p.recordTime).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone })
       );
 
       let reg = report?.regularHours || 0;
@@ -618,8 +621,8 @@ export async function GET(request: NextRequest) {
         fullName,
         `${dd}/${mm}/${yyyy}`,
         dayNames[dayOfWeek],
-        report?.firstPunchIn ? new Date(report.firstPunchIn).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Casablanca" }) : (punchTimes[0] || "-"),
-        report?.lastPunchOut ? new Date(report.lastPunchOut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Casablanca" }) : (punchTimes.length > 1 ? punchTimes[punchTimes.length - 1] : "-"),
+        report?.firstPunchIn ? new Date(report.firstPunchIn).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone }) : (punchTimes[0] || "-"),
+        report?.lastPunchOut ? new Date(report.lastPunchOut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone }) : (punchTimes.length > 1 ? punchTimes[punchTimes.length - 1] : "-"),
         punchTimes.length > 0 ? punchTimes.join(" | ") : "-",
         reg,
         ot150,
@@ -660,7 +663,7 @@ export async function GET(request: NextRequest) {
           cell.numFmt = "0.00";
         } else if (canViewSalaries && colNum === 12) {
           cell.alignment = { horizontal: "right", vertical: "middle" };
-          cell.numFmt = "#,##0.00\" DH\"";
+          cell.numFmt = "#,##0.00 \"" + currency + "\"";
           cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: successColor } };
         } else {
           cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -713,7 +716,7 @@ export async function GET(request: NextRequest) {
         cell.numFmt = "0.00";
       } else if (canViewSalaries && colNum === 12) {
         cell.alignment = { horizontal: "right", vertical: "middle" };
-        cell.numFmt = "#,##0.00\" DH\"";
+        cell.numFmt = "#,##0.00 \"" + currency + "\"";
         cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: successColor } };
       }
     });

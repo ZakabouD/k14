@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { CheckCircle2 } from "lucide-react";
 import { AnomalyCard } from "@/components/AnomalyCard";

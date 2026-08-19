@@ -6,8 +6,8 @@ import { Sidebar } from "@/components/Sidebar";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "e-Cut Solutions Suivi - Tableau de Bord",
-  description: "Suivi et gestion professionnels du personnel de l'atelier e-Cut Solutions.",
+  title: "Suivi du Personnel & Gestion de Paie",
+  description: "Plateforme professionnelle de gestion des présences, des pointages et de la paie.",
 };
 
 export default function RootLayout({
@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -29,16 +29,14 @@ export default function RootLayout({
                   document.documentElement.classList.remove('light');
                 }
               })();
-            `
+            `,
           }}
         />
       </head>
-      <body className={`${inter.variable} font-sans antialiased bg-background text-foreground min-h-screen flex`}>
+      <body className={`${inter.variable} font-sans antialiased min-h-screen bg-background text-foreground flex`}>
         <Sidebar />
-        <main className="flex-1 lg:ml-64 p-4 md:p-8 pt-20 lg:pt-8 overflow-y-auto w-full">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
+        <main className="flex-1 lg:ml-64 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto w-full pt-20 lg:pt-8">
+          {children}
         </main>
       </body>
     </html>

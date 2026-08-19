@@ -2074,6 +2074,14 @@ export async function updateOvertimeSettings(formData: FormData) {
 export async function saveAllSystemSettings(formData: FormData) {
   await verifyAuth();
 
+  // 0. Company Identity & Regional Settings
+  const companyName = (formData.get("companyName") as string)?.trim() || "Mon Entreprise";
+  const companyAddress = (formData.get("companyAddress") as string)?.trim() || null;
+  const companyPhone = (formData.get("companyPhone") as string)?.trim() || null;
+  const companyEmail = (formData.get("companyEmail") as string)?.trim() || null;
+  const currency = (formData.get("currency") as string)?.trim() || "DH";
+  const timezone = (formData.get("timezone") as string)?.trim() || "Africa/Casablanca";
+
   // 1. ZKTeco Hardware Connection parameters
   const deviceIp = formData.get("deviceIp") as string;
   const devicePortRaw = formData.get("devicePort") as string;
@@ -2127,6 +2135,12 @@ export async function saveAllSystemSettings(formData: FormData) {
     await prisma.systemSettings.update({
       where: { id: "singleton" },
       data: {
+        companyName,
+        companyAddress,
+        companyPhone,
+        companyEmail,
+        currency,
+        timezone,
         deviceIp,
         devicePort,
         deviceTimeout,
@@ -2166,12 +2180,24 @@ export async function saveAllSystemSettings(formData: FormData) {
 export async function getSidebarSession() {
   const session = await getSession();
   if (!session) return null;
-  
+
+  let companyName = process.env.COMPANY_NAME || "Mon Entreprise";
+  let currency = process.env.DEFAULT_CURRENCY || "DH";
+  try {
+    const settings = await prisma.systemSettings.findFirst({
+      select: { companyName: true, currency: true }
+    });
+    if (settings?.companyName) companyName = settings.companyName;
+    if (settings?.currency) currency = settings.currency;
+  } catch (e) {}
+
   if (session.adminId === "admin") {
     return {
       role: "SUPERADMIN",
       name: "Administrateur Système",
-      email: session.email || "admin@ecutsolutions.com",
+      email: session.email || process.env.ADMIN_EMAIL || "admin@example.com",
+      companyName,
+      currency,
       permissions: {
         canManagePersonnel: true,
         canManageShifts: true,
@@ -2186,6 +2212,8 @@ export async function getSidebarSession() {
     role: session.role,
     name: session.name,
     email: session.email,
+    companyName,
+    currency,
     permissions: session.permissions
   };
 }
@@ -2909,6 +2937,8 @@ export async function getSalaryOverview(
     periodMode,
     dateValue,
     periodLabel,
+    companyName: settings?.companyName || "Mon Entreprise",
+    currency: settings?.currency || "DH",
     data: salaryData,
     kpis
   };

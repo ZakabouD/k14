@@ -21,7 +21,7 @@ export default async function UsersPage() {
 
   const users = await getDashboardUsers();
   const settings = await prisma.systemSettings.findFirst();
-  const masterAdminEmail = settings?.adminEmail || "admin@ecutsolutions.com";
+  const masterAdminEmail = settings?.adminEmail || process.env.ADMIN_EMAIL || "admin@example.com";
 
   return (
     <UsersClient 

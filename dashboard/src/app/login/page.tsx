@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, Loader2 } from "lucide-react";
+import { Lock, Loader2, Clock } from "lucide-react";
 import { loginAdmin } from "../actions";
 
 export default function LoginPage() {
@@ -19,7 +19,7 @@ export default function LoginPage() {
     if (result.success) {
       window.location.href = "/";
     } else {
-      setError(result.error || "Login failed");
+      setError(result.error || "Identifiants invalides");
       setIsSubmitting(false);
     }
   };
@@ -31,10 +31,10 @@ export default function LoginPage() {
       <div className="glass-panel p-8 w-full max-w-md relative z-10">
         <div className="flex flex-col items-center mb-8">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4 shadow-[0_0_20px_var(--primary-glow)]">
-            <span className="font-bold text-white text-2xl">e</span>
+            <Clock className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">e-Cut Solutions <span className="text-primary font-medium">Suivi</span></h1>
-          <p className="text-foreground/50 text-sm mt-1">Connectez-vous au suivi d'atelier</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Pointage & Paie <span className="text-primary font-medium">Atelier</span></h1>
+          <p className="text-foreground/50 text-sm mt-1">Connectez-vous à votre espace d'administration</p>
         </div>
 
         {error && (
@@ -45,24 +45,24 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-foreground/70 mb-1">Email Address</label>
+            <label className="block text-sm font-medium text-foreground/70 mb-1">Adresse Email</label>
             <input 
               required
               name="email"
               type="email" 
-              placeholder="e.g. admin@ecutsolutions.com"
+              placeholder="ex: admin@example.com"
               className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-primary transition-colors"
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-foreground/70 mb-1">Password</label>
+            <label className="block text-sm font-medium text-foreground/70 mb-1">Mot de Passe</label>
             <div className="relative">
               <input 
                 required
                 name="password"
                 type="password" 
-                placeholder="Enter password"
+                placeholder="Entrez votre mot de passe"
                 className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-3 text-foreground focus:outline-none focus:border-primary transition-colors"
               />
               <Lock className="w-4 h-4 text-foreground/50 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -73,16 +73,16 @@ export default function LoginPage() {
             <button 
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-white font-medium py-3 rounded-lg shadow-[0_0_15px_var(--primary-glow)] transition-all flex items-center justify-center"
+              className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-white font-medium py-3 rounded-lg shadow-[0_0_15px_var(--primary-glow)] transition-all flex items-center justify-center cursor-pointer"
             >
-              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Secure Login"}
+              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Connexion Sécurisée"}
             </button>
           </div>
         </form>
       </div>
       
       <p className="absolute bottom-8 text-xs text-foreground/40 font-medium">
-        &copy; 2026 e-Cut Solutions Suivi
+        &copy; {new Date().getFullYear()} Système de Pointage & Gestion de Paie
       </p>
     </div>
   );
