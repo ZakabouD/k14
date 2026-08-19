@@ -12,6 +12,11 @@
     "migrate:deploy": "prisma migrate deploy",
     "migrate:status": "prisma migrate status",
     "generate": "prisma generate",
+    "docker:up": "docker compose --env-file .env.docker up -d --build",
+    "docker:down": "docker compose --env-file .env.docker down",
+    "docker:logs": "docker compose --env-file .env.docker logs -f dashboard",
+    "docker:ps": "docker compose --env-file .env.docker ps",
+    "docker:config": "docker compose --env-file .env.docker config",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
