@@ -1,0 +1,32 @@
+{
+	# Global options
+	admin off
+	log {
+		output stdout
+		format console
+	}
+}
+
+{$APP_DOMAIN:localhost} {
+	# Reverse proxy to Next.js dashboard
+	reverse_proxy dashboard:3000 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	# HTTP Security Headers
+	header {
+		# Prevent MIME sniffing
+		X-Content-Type-Options "nosniff"
+		# Prevent iframe embedding (clickjacking protection)
+		X-Frame-Options "DENY"
+		# Referrer privacy policy
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Restrict dangerous browser capabilities
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Strip Server banner
+		-Server
+	}
+
+	# Optional local TLS override (e.g. tls internal)
+	{$TLS_CONFIG}
+}

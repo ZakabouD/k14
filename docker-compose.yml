@@ -1,4 +1,25 @@
 services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: zk_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+      TLS_CONFIG: ${TLS_CONFIG:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - frontend_net
+    depends_on:
+      dashboard:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     container_name: zk_postgres
@@ -10,7 +31,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - internal_net
+      - backend_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-attendance_user} -d $${POSTGRES_DB:-attendance}"]
       interval: 5s
@@ -36,7 +57,7 @@ services:
       DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-DH}
       TIMEZONE: ${TIMEZONE:-Africa/Casablanca}
     networks:
-      - internal_net
+      - backend_net
 
   dashboard:
     build:
@@ -54,11 +75,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-attendance_user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env.docker}@postgres:5432/${POSTGRES_DB:-attendance}?schema=public
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required in .env.docker}
       NODE_ENV: production
-      PORT: ${PORT:-3000}
-    ports:
-      - "127.0.0.1:${PORT:-3000}:3000"
+      PORT: 3000
+    expose:
+      - "3000"
     networks:
-      - internal_net
+      - frontend_net
+      - backend_net
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health | grep -q '\"status\":\"ok\"' || exit 1"]
       interval: 10s
@@ -69,7 +91,15 @@ services:
 volumes:
   postgres_data:
     name: zk_commercial_postgres_data
+  caddy_data:
+    name: zk_commercial_caddy_data
+  caddy_config:
+    name: zk_commercial_caddy_config
 
 networks:
-  internal_net:
+  frontend_net:
+    name: zk_commercial_frontend_net
+    driver: bridge
+  backend_net:
+    name: zk_commercial_backend_net
     driver: bridge
