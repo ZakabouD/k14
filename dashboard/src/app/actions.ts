@@ -7,8 +7,16 @@ import { promisify } from "util";
 import path from "path";
 import { headers } from "next/headers";
 import { getSession, createSession, deleteSession } from "@/lib/session";
-import { serverCalculationService } from "@/lib/server-calculation";
+import { serverCalculationService, calculateCanonicalPayroll } from "@/lib/server-calculation";
 import { loginRateLimiter } from "@/lib/rate-limiter";
+import {
+  getCompanyTimezone,
+  getCompanyDayStart,
+  getCompanyDayEnd,
+  isCompanySunday,
+  isCompanySaturday,
+  getLocalDateComponents
+} from "@/lib/date-utils";
 import bcrypt from "bcrypt";
 import { parseContractTypes, parseLeaveTypes } from "../lib/tags";
 
@@ -470,8 +478,7 @@ export async function getEmployeeStats(userId: string, startDateStr: string, end
       } else if (r.status === 'LEAVE') {
         daysLeave++;
       } else {
-        const day = new Date(r.date).getDay();
-        const isWeekend = day === 0;
+        const isWeekend = isCompanySunday(r.date, timezone);
         const isHoliday = r.status === 'HOLIDAY';
         if (!isWeekend && !isHoliday) {
           daysAbsent++;
@@ -509,9 +516,9 @@ export async function getEmployeeStats(userId: string, startDateStr: string, end
         return rUtc.getTime() === curUtc.getTime();
       });
 
-      const dayOfWeek = curUtc.getUTCDay();
-      const dayName = curUtc.toLocaleDateString("fr-FR", { weekday: 'short' });
-      const dayNumStr = curUtc.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit' });
+      const dayOfWeek = getLocalDateComponents(curUtc, timezone).dayOfWeek;
+      const dayName = curUtc.toLocaleDateString("fr-FR", { weekday: 'short', timeZone: timezone });
+      const dayNumStr = curUtc.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', timeZone: timezone });
 
       let reg = 0;
       let o150 = 0;
@@ -640,6 +647,11 @@ export async function resolveAnomaly(
 
   if (!report) return { success: false, error: "Rapport journalier introuvable" };
 
+  const settings = await prisma.systemSettings.findFirst({
+    select: { otThresholdLimit: true, timezone: true }
+  });
+  const timezone = getCompanyTimezone(settings?.timezone);
+
   // 2. Parse punch-in date
   let punchInDate = report.firstPunchIn;
   if (manualPunchInTime) {
@@ -694,44 +706,38 @@ export async function resolveAnomaly(
     ));
   }
 
-  // 4. Calculate hours and load overtime threshold settings
-  const settings = await prisma.systemSettings.findFirst({
-    select: { otThresholdLimit: true }
+  // 4. Check for public holiday
+  const holiday = await prisma.holiday.findFirst({
+    where: { date: report.date }
   });
-  const threshold = settings?.otThresholdLimit ?? 2.0;
 
-  const diffMs = Math.max(0, punchOutDate.getTime() - punchInDate.getTime());
-  const rawHours = diffMs / (1000 * 60 * 60);
-  const lunchBreakMinutes = report.user.shift?.lunchBreak ?? 0;
-  const totalHours = (rawHours > 5.0 && lunchBreakMinutes > 0)
-    ? Math.max(0, rawHours - (lunchBreakMinutes / 60))
-    : rawHours;
+  // 5. Canonical payroll calculation (single source of truth)
+  const payroll = calculateCanonicalPayroll({
+    date: report.date,
+    firstPunchIn: punchInDate,
+    lastPunchOut: punchOutDate,
+    punchesCount: 2,
+    shift: report.user.shift,
+    holiday,
+    timezone,
+    settings
+  });
 
-  let baseHours = report.user.shift?.baseHours || 8;
-  if (report.date.getUTCDay() === 6) {
-    baseHours = report.user.shift ? report.user.shift.saturdayHours : (baseHours / 2);
-  }
-  const regularHours = Math.min(totalHours, baseHours);
-  
-  const extraHours = Math.max(0, totalHours - baseHours);
-  const overtime150Hours = Math.min(extraHours, threshold);
-  const overtime200Hours = Math.max(0, extraHours - threshold);
-
-  // 5. Update the report to RESOLVED
+  // 6. Update the report to RESOLVED with canonical calculated payroll
   await prisma.calculatedDailyReport.update({
     where: { id: reportId },
     data: {
       firstPunchIn: punchInDate,
       lastPunchOut: punchOutDate,
-      regularHours: Number(regularHours.toFixed(2)),
-      overtime150Hours: Number(overtime150Hours.toFixed(2)),
-      overtime200Hours: Number(overtime200Hours.toFixed(2)),
+      regularHours: payroll.regularHours,
+      overtime150Hours: payroll.overtime150Hours,
+      overtime200Hours: payroll.overtime200Hours,
       status: 'RESOLVED',
       anomalyReason: null
     }
   });
 
-  // 6. Record synthetic admin correction punches in RawPunch so raw punches history modal reflects the resolution
+  // 7. Record synthetic admin correction punches in RawPunch so raw punches history modal reflects the resolution
   try {
     if (manualPunchInTime && punchInDate) {
       await prisma.rawPunch.upsert({
@@ -772,9 +778,7 @@ export async function resolveAnomaly(
         update: {}
       });
     }
-  } catch (err) {
-    console.error("Failed to record synthetic admin raw punches:", err);
-  }
+  } catch (_) {}
 
   revalidatePath("/");
   revalidatePath("/anomalies");
@@ -1201,7 +1205,7 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
 
     while (cur <= end) {
       const dStr = cur.toISOString().split("T")[0];
-      const dayOfWeek = cur.getUTCDay();
+      const dayOfWeek = getLocalDateComponents(cur, timezone).dayOfWeek;
       const isSunday = dayOfWeek === 0;
       const isHoliday = holidayDates.has(dStr);
 
@@ -1310,7 +1314,7 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
     const dStr = curD.toISOString().split("T")[0];
     const dd = String(curD.getUTCDate()).padStart(2, "0");
     const mm = String(curD.getUTCMonth() + 1).padStart(2, "0");
-    const dayOfWeek = curD.getUTCDay();
+    const dayOfWeek = getLocalDateComponents(curD, timezone).dayOfWeek;
     const dayName = dayNames[dayOfWeek];
     const label = `${dayName.slice(0, 3)}. ${dd}/${mm}`;
 
@@ -1396,7 +1400,7 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
   const countCur = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
   const countEnd = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate()));
   while (countCur <= countEnd) {
-    if (countCur.getUTCDay() !== 0) {
+    if (!isCompanySunday(countCur, timezone)) {
       workingDaysCount++;
     }
     countCur.setDate(countCur.getDate() + 1);
@@ -2225,20 +2229,20 @@ export async function getDashboardData(
     const dayFmt = startDate.toLocaleDateString("fr-FR", { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
     periodLabel = `Hier (${dayFmt})`;
   } else if (periodFilter === "THIS_WEEK") {
-    const day = todayUtc.getUTCDay();
-    const diffToMonday = (day === 0 ? -6 : 1 - day);
+    const comp = getLocalDateComponents(todayUtc, timezone);
+    const diffToMonday = (comp.dayOfWeek === 0 ? -6 : 1 - comp.dayOfWeek);
     startDate = new Date(Date.UTC(todayUtc.getUTCFullYear(), todayUtc.getUTCMonth(), todayUtc.getUTCDate() + diffToMonday, 0, 0, 0, 0));
     endDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate() + 6, 23, 59, 59, 999));
-    const startFmt = startDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit' });
-    const endFmt = endDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const startFmt = startDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', timeZone: timezone });
+    const endFmt = endDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: timezone });
     periodLabel = `Cette Semaine (du ${startFmt} au ${endFmt})`;
   } else if (periodFilter === "LAST_WEEK") {
-    const day = todayUtc.getUTCDay();
-    const diffToMonday = (day === 0 ? -6 : 1 - day) - 7;
+    const comp = getLocalDateComponents(todayUtc, timezone);
+    const diffToMonday = (comp.dayOfWeek === 0 ? -6 : 1 - comp.dayOfWeek) - 7;
     startDate = new Date(Date.UTC(todayUtc.getUTCFullYear(), todayUtc.getUTCMonth(), todayUtc.getUTCDate() + diffToMonday, 0, 0, 0, 0));
     endDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate() + 6, 23, 59, 59, 999));
-    const startFmt = startDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit' });
-    const endFmt = endDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const startFmt = startDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', timeZone: timezone });
+    const endFmt = endDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: timezone });
     periodLabel = `Semaine Dernière (du ${startFmt} au ${endFmt})`;
   } else if (periodFilter === "THIS_MONTH") {
     startDate = new Date(Date.UTC(todayUtc.getUTCFullYear(), todayUtc.getUTCMonth(), 1, 0, 0, 0, 0));
@@ -2434,8 +2438,7 @@ export async function getDashboardData(
 
     for (let d = new Date(startDate.getTime()); d.getTime() <= userMaxCalcDate.getTime(); d.setTime(d.getTime() + dayMs)) {
       const curUtc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-      const dayOfWeek = curUtc.getUTCDay();
-      const isSunday = dayOfWeek === 0;
+      const isSunday = isCompanySunday(curUtc, timezone);
 
       const isHoliday = periodHolidays.some(h => {
         const hUtc = new Date(Date.UTC(h.date.getUTCFullYear(), h.date.getUTCMonth(), h.date.getUTCDate()));
@@ -2575,6 +2578,12 @@ export async function getSalaryOverview(
 ) {
   await verifyAuth();
 
+  const settings = await prisma.systemSettings.findFirst();
+  const timezone = getCompanyTimezone(settings?.timezone);
+  const otRate1 = settings?.otRate1 ?? 1.5;
+  const otRate2 = settings?.otRate2 ?? 2.0;
+  const parsedContracts = parseContractTypes(settings?.contractTypes || "[]");
+
   const now = new Date();
   let startDate: Date;
   let endDate: Date;
@@ -2590,8 +2599,8 @@ export async function getSalaryOverview(
     startDate = new Date(Date.UTC(sDate.getUTCFullYear(), sDate.getUTCMonth(), sDate.getUTCDate(), 0, 0, 0, 0));
     endDate = new Date(Date.UTC(eDate.getUTCFullYear(), eDate.getUTCMonth(), eDate.getUTCDate(), 23, 59, 59, 999));
 
-    const startFmt = startDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const endFmt = endDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const startFmt = startDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: timezone });
+    const endFmt = endDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: timezone });
     periodLabel = `du ${startFmt} au ${endFmt}`;
     dateValue = selectedDateStr || "";
   } else if (periodMode === "WEEKLY") {
@@ -2599,13 +2608,13 @@ export async function getSalaryOverview(
     if (isNaN(baseDate.getTime())) {
       baseDate.setTime(now.getTime());
     }
-    const day = baseDate.getUTCDay();
-    const diffToMonday = (day === 0 ? -6 : 1 - day);
+    const comp = getLocalDateComponents(baseDate, timezone);
+    const diffToMonday = (comp.dayOfWeek === 0 ? -6 : 1 - comp.dayOfWeek);
     startDate = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate() + diffToMonday, 0, 0, 0, 0));
     endDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate() + 6, 23, 59, 59, 999));
     
-    const startFmt = startDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit' });
-    const endFmt = endDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const startFmt = startDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', timeZone: timezone });
+    const endFmt = endDate.toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: timezone });
     periodLabel = `Semaine du ${startFmt} au ${endFmt}`;
     dateValue = startDate.toISOString().split("T")[0]!;
   } else {
@@ -2616,14 +2625,9 @@ export async function getSalaryOverview(
 
     startDate = new Date(Date.UTC(year, monthIdx, 1, 0, 0, 0, 0));
     endDate = new Date(Date.UTC(year, monthIdx + 1, 0, 23, 59, 59, 999));
-    periodLabel = startDate.toLocaleDateString("fr-FR", { month: 'long', year: 'numeric' });
+    periodLabel = startDate.toLocaleDateString("fr-FR", { month: 'long', year: 'numeric', timeZone: timezone });
     dateValue = monthStr;
   }
-
-  const settings = await prisma.systemSettings.findFirst();
-  const otRate1 = settings?.otRate1 ?? 1.5;
-  const otRate2 = settings?.otRate2 ?? 2.0;
-  const parsedContracts = parseContractTypes(settings?.contractTypes || "[]");
 
   // Load all active non-exempt users (excluding Direction / Owners)
   const users = await prisma.user.findMany({

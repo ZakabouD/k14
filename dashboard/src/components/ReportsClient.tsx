@@ -764,7 +764,7 @@ export default function ReportsClient({
                       <p className="text-xs text-foreground/50">
                         {isSingleUser 
                           ? `Décompte journalier exact pour ${selectedUser?.firstName} ${selectedUser?.lastName}`
-                          : "Activité cumulée de l'ensemble de l'atelier jour par jour sur la période sélectionnée"}
+                          : "Activité cumulée de l'ensemble du personnel jour par jour sur la période sélectionnée"}
                       </p>
                     </div>
 

@@ -4,6 +4,7 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { formatDate } from "@/lib/utils";
 import { recalculateUserRange } from "@/app/actions";
+import { isCompanySunday, getCompanyTimezone, getLocalDateComponents } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -580,7 +581,7 @@ export async function GET(request: NextRequest) {
 
     while (cur <= end) {
       const dStr = cur.toISOString().split("T")[0];
-      const dayOfWeek = cur.getUTCDay();
+      const dayOfWeek = getLocalDateComponents(cur, timezone).dayOfWeek;
       const isSunday = dayOfWeek === 0;
 
       const report = reports.find(r => r.userId === user.id && r.date.toISOString().split("T")[0] === dStr);

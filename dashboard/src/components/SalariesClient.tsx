@@ -1673,7 +1673,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                   {/* Header */}
                   <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
                     <div>
-                      <h1 className="text-xl font-black text-slate-900 tracking-tight">{companyName.toUpperCase()} - SUIVI D'ATELIER</h1>
+                      <h1 className="text-xl font-black text-slate-900 tracking-tight">{companyName.toUpperCase()} - SUIVI DES PRÉSENCES & PAIE</h1>
                       <p className="text-xs text-slate-600 font-bold mt-0.5">BULLETIN DE PAIE & FICHE INDIVIDUELLE</p>
                     </div>
                     <div className="text-right">
@@ -1813,7 +1813,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
             <div className="space-y-6 p-4 bg-white">
               <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
                 <div>
-                  <h1 className="text-2xl font-black text-slate-900 tracking-tight">{companyName.toUpperCase()} - SUIVI D'ATELIER</h1>
+                  <h1 className="text-2xl font-black text-slate-900 tracking-tight">{companyName.toUpperCase()} - SUIVI DES PRÉSENCES & PAIE</h1>
                   <p className="text-xs text-slate-600 font-semibold">ORDRE DE PAIEMENT & BORDEREAU DES SALAIRES</p>
                 </div>
                 <div className="text-right">

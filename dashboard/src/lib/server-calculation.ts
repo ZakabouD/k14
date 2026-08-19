@@ -6,7 +6,6 @@ import {
   isCompanySunday,
   isCompanySaturday,
   getCompanyTimeMinutes,
-  getLocalDateComponents
 } from "./date-utils";
 
 export interface RawPunchData {
@@ -37,6 +36,110 @@ export interface UserWithShift {
     autoClose: boolean;
     saturdayHours: number;
   } | null;
+}
+
+export interface PayrollCalculationInput {
+  date: Date;
+  firstPunchIn: Date | null;
+  lastPunchOut: Date | null;
+  punchesCount?: number;
+  rawDurationHours?: number;
+  shift: UserWithShift["shift"] | null;
+  holiday: any | null;
+  timezone: string;
+  settings: {
+    otThresholdLimit?: number | null;
+    gracePeriod?: number | null;
+  } | null;
+  virtualPunchOut?: boolean;
+}
+
+export interface PayrollCalculationOutput {
+  regularHours: number;
+  overtime150Hours: number;
+  overtime200Hours: number;
+  totalHours: number;
+  status: string;
+}
+
+/**
+ * Canonical pure payroll calculation function.
+ * Single source of truth for:
+ * 1. Automated daily report generation from sync
+ * 2. Manual date-range recalculations
+ * 3. Administrative anomaly resolutions
+ */
+export function calculateCanonicalPayroll(input: PayrollCalculationInput): PayrollCalculationOutput {
+  const {
+    date,
+    firstPunchIn,
+    lastPunchOut,
+    punchesCount = 2,
+    rawDurationHours,
+    shift,
+    holiday,
+    timezone,
+    settings,
+    virtualPunchOut = false
+  } = input;
+
+  let totalHours = 0;
+  if (virtualPunchOut && shift) {
+    totalHours = isCompanySaturday(date, timezone) ? shift.saturdayHours : shift.baseHours;
+  } else if (firstPunchIn && lastPunchOut && firstPunchIn.getTime() !== lastPunchOut.getTime()) {
+    let rawHours = rawDurationHours;
+    if (rawHours === undefined) {
+      rawHours = Math.max(0, lastPunchOut.getTime() - firstPunchIn.getTime()) / (1000 * 60 * 60);
+    }
+    const lunchBreakMinutes = shift?.lunchBreak ?? 0;
+    totalHours = (punchesCount === 2 && rawHours > 5.0 && lunchBreakMinutes > 0)
+      ? Math.max(0, rawHours - (lunchBreakMinutes / 60))
+      : rawHours;
+  }
+
+  let regularHours = 0;
+  let overtime150Hours = 0;
+  let overtime200Hours = 0;
+  let status = holiday ? "HOLIDAY" : "OK";
+
+  let baseHours = shift?.baseHours || 8.0;
+  if (isCompanySaturday(date, timezone)) {
+    baseHours = shift ? shift.saturdayHours : (baseHours / 2);
+  }
+
+  // Preserved Business Rule: Sundays & Public Holidays are 200% overtime
+  const isRestDayOrHoliday = isCompanySunday(date, timezone) || !!holiday;
+
+  if (isRestDayOrHoliday) {
+    overtime200Hours = totalHours;
+    regularHours = 0;
+    overtime150Hours = 0;
+    if (holiday) {
+      status = "HOLIDAY";
+    }
+  } else {
+    if (totalHours <= baseHours) {
+      regularHours = totalHours;
+    } else {
+      regularHours = baseHours;
+      const threshold = settings?.otThresholdLimit ?? 2.0;
+      const overtime = totalHours - baseHours;
+      if (overtime <= threshold) {
+        overtime150Hours = overtime;
+      } else {
+        overtime150Hours = threshold;
+        overtime200Hours = overtime - threshold;
+      }
+    }
+  }
+
+  return {
+    regularHours: Number(regularHours.toFixed(2)),
+    overtime150Hours: Number(overtime150Hours.toFixed(2)),
+    overtime200Hours: Number(overtime200Hours.toFixed(2)),
+    totalHours: Number(totalHours.toFixed(2)),
+    status
+  };
 }
 
 export class ServerAnomalyService {
@@ -317,59 +420,39 @@ export class ServerCalculationService {
       status = "HOLIDAY";
     }
 
-    // Working hours calculation
+    // Working hours calculation using canonical pure payroll function
     if (!anomaly.isAnomaly && firstPunchIn && lastPunchOut && firstPunchIn !== lastPunchOut) {
-      let totalHours = 0;
-      if (virtualPunchOut && user.shift) {
-        totalHours = isCompanySaturday(startOfDay, timezone) ? user.shift.saturdayHours : user.shift.baseHours;
-      } else {
-        let sumMs = 0;
-        for (let i = 0; i < punches.length; i += 2) {
-          if (punches[i] && punches[i + 1]) {
-            let pStart = punches[i].recordTime.getTime();
-            let pEnd = punches[i + 1].recordTime.getTime();
-            if (i === 0 && firstPunchIn) {
-              pStart = firstPunchIn.getTime();
-            }
-            sumMs += Math.max(0, pEnd - pStart);
+      let sumMs = 0;
+      for (let i = 0; i < punches.length; i += 2) {
+        if (punches[i] && punches[i + 1]) {
+          let pStart = punches[i].recordTime.getTime();
+          let pEnd = punches[i + 1].recordTime.getTime();
+          if (i === 0 && firstPunchIn) {
+            pStart = firstPunchIn.getTime();
           }
+          sumMs += Math.max(0, pEnd - pStart);
         }
-        const rawHours = sumMs / (1000 * 60 * 60);
-        const lunchBreakMinutes = user.shift?.lunchBreak ?? 0;
-        totalHours = (punches.length === 2 && rawHours > 5.0 && lunchBreakMinutes > 0)
-          ? Math.max(0, rawHours - (lunchBreakMinutes / 60))
-          : rawHours;
       }
+      const rawHours = sumMs / (1000 * 60 * 60);
 
-      let baseHours = user.shift?.baseHours || 8.0;
-      if (isCompanySaturday(startOfDay, timezone)) {
-        baseHours = user.shift ? user.shift.saturdayHours : (baseHours / 2);
-      }
+      const payroll = calculateCanonicalPayroll({
+        date: startOfDay,
+        firstPunchIn,
+        lastPunchOut,
+        punchesCount: punches.length,
+        rawDurationHours: rawHours,
+        shift: user.shift,
+        holiday,
+        timezone,
+        settings,
+        virtualPunchOut
+      });
 
-      // Preserved Business Rule: Sundays & Public Holidays are 200% overtime
-      const isRestDayOrHoliday = isCompanySunday(startOfDay, timezone) || !!holiday;
-
-      if (isRestDayOrHoliday) {
-        overtime200Hours = totalHours;
-        regularHours = 0;
-        overtime150Hours = 0;
-        if (holiday) {
-          status = "HOLIDAY";
-        }
-      } else {
-        if (totalHours <= baseHours) {
-          regularHours = totalHours;
-        } else {
-          regularHours = baseHours;
-          const threshold = settings?.otThresholdLimit ?? 2.0;
-          const overtime = totalHours - baseHours;
-          if (overtime <= threshold) {
-            overtime150Hours = overtime;
-          } else {
-            overtime150Hours = threshold;
-            overtime200Hours = overtime - threshold;
-          }
-        }
+      regularHours = payroll.regularHours;
+      overtime150Hours = payroll.overtime150Hours;
+      overtime200Hours = payroll.overtime200Hours;
+      if (!anomaly.isAnomaly && holiday) {
+        status = payroll.status;
       }
     }
 
