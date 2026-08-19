@@ -21,6 +21,7 @@ dev/
 backups/**/*.dump
 backups/**/*.dump.partial
 backups/**/*.sha256
+backups/**/*.complete
 backups/**/*.sql
 backups/**/*.tar
 backups/**/*.gz
