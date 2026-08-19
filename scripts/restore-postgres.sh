@@ -10,7 +10,7 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${ROOT_DIR}/.env.docker"
 
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 <path_to_backup.dump> [target_database_name] [--keep]" >&2
+    echo "Usage: $0 <path_to_backup.dump> [target_database_name] [--keep|--drop]" >&2
     echo "" >&2
     echo "Example: $0 backups/postgres/attendance_2026-08-19_200000Z.dump" >&2
     exit 1
@@ -44,13 +44,28 @@ CONTAINER_NAME="zk_postgres"
 
 # Determine target database name (Must NEVER equal active POSTGRES_DB)
 TIMESTAMP="$(date -u +"%Y%m%d_%H%M%S")"
-TARGET_DB="${2:-attendance_restore_test_${TIMESTAMP}}"
+TARGET_DB=""
 KEEP_DB=false
-if [[ "${2:-}" == "--keep" ]] || [[ "${3:-}" == "--keep" ]]; then
-    KEEP_DB=true
-fi
-if [[ "${2:-}" == "--drop" ]] || [[ "${3:-}" == "--drop" ]]; then
-    KEEP_DB=false
+
+for arg in "${@:2}"; do
+    if [[ "${arg}" == "--keep" ]]; then
+        KEEP_DB=true
+    elif [[ "${arg}" == "--drop" ]]; then
+        KEEP_DB=false
+    elif [[ -z "${TARGET_DB}" ]]; then
+        TARGET_DB="${arg}"
+    fi
+done
+
+TARGET_DB="${TARGET_DB:-attendance_restore_test_${TIMESTAMP}}"
+
+# ==============================================================================
+# TARGET DATABASE NAME VALIDATION
+# ==============================================================================
+if [[ ! "${TARGET_DB}" =~ ^[A-Za-z][A-Za-z0-9_]{0,62}$ ]]; then
+    echo "[-] ERROR: Invalid target database name '${TARGET_DB}'." >&2
+    echo "[-] Allowed format: Must start with a letter and contain only alphanumeric characters or underscores (max 63 chars)." >&2
+    exit 1
 fi
 
 # ==============================================================================
@@ -68,6 +83,16 @@ echo " Backup File:   ${BACKUP_PATH}"
 echo " Target DB:     ${TARGET_DB}"
 echo " Container:     ${CONTAINER_NAME}"
 echo "============================================================"
+
+# Safe signal trap cleanup for temporary database
+CLEANUP_DB_ON_EXIT=false
+cleanup_restore_db() {
+    if [[ "${CLEANUP_DB_ON_EXIT}" == "true" && -n "${TARGET_DB:-}" && "${TARGET_DB}" != "${POSTGRES_DB}" ]]; then
+        echo "[-] Interruption received. Cleaning up temporary database '${TARGET_DB}'..." >&2
+        docker exec "${CONTAINER_NAME}" psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE IF EXISTS \"${TARGET_DB}\";" >/dev/null 2>&1 || true
+    fi
+}
+trap cleanup_restore_db INT TERM
 
 # Step 1: Check backup file existence
 if [[ ! -f "${BACKUP_PATH}" ]]; then
@@ -128,13 +153,12 @@ fi
 
 # Step 5: Create isolated temporary restore database
 echo "[+] Creating temporary restore database '${TARGET_DB}'..."
-# Drop prior test database if it exists
+CLEANUP_DB_ON_EXIT=true
 docker exec "${CONTAINER_NAME}" psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE IF EXISTS \"${TARGET_DB}\";" >/dev/null 2>&1
 docker exec "${CONTAINER_NAME}" psql -U "${POSTGRES_USER}" -d postgres -c "CREATE DATABASE \"${TARGET_DB}\";" >/dev/null 2>&1
 
 # Step 6: Restore archive into temporary database
 echo "[+] Restoring data into '${TARGET_DB}'..."
-# pg_restore might return exit code 0 or 1 (for non-fatal warnings on clean DB)
 set +e
 docker exec -i "${CONTAINER_NAME}" pg_restore -U "${POSTGRES_USER}" -d "${TARGET_DB}" --no-owner --no-privileges < "${BACKUP_PATH}" >/dev/null 2>&1
 RESTORE_STATUS=$?
@@ -143,6 +167,7 @@ set -e
 if [[ ${RESTORE_STATUS} -ne 0 && ${RESTORE_STATUS} -ne 1 ]]; then
     echo "[-] ERROR: pg_restore failed with exit code ${RESTORE_STATUS}." >&2
     docker exec "${CONTAINER_NAME}" psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE IF EXISTS \"${TARGET_DB}\";" >/dev/null 2>&1 || true
+    CLEANUP_DB_ON_EXIT=false
     exit 1
 fi
 
@@ -167,6 +192,7 @@ VERIFICATION_OUTPUT="$(docker exec "${CONTAINER_NAME}" psql -U "${POSTGRES_USER}
 if [[ "${VERIFICATION_OUTPUT}" == "QUERY_ERROR" || -z "${VERIFICATION_OUTPUT}" ]]; then
     echo "[-] ERROR: Failed to query required tables from restored database '${TARGET_DB}'." >&2
     docker exec "${CONTAINER_NAME}" psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE IF EXISTS \"${TARGET_DB}\";" >/dev/null 2>&1 || true
+    CLEANUP_DB_ON_EXIT=false
     exit 1
 fi
 
@@ -183,7 +209,9 @@ if [[ "${KEEP_DB}" == "false" ]]; then
     echo "[+] Dropping temporary verification database '${TARGET_DB}'..."
     docker exec "${CONTAINER_NAME}" psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE IF EXISTS \"${TARGET_DB}\";" >/dev/null 2>&1
     echo "[+] Cleaned up temporary database."
+    CLEANUP_DB_ON_EXIT=false
 else
+    CLEANUP_DB_ON_EXIT=false
     echo "[i] Temporary verification database '${TARGET_DB}' retained for inspection."
 fi
 

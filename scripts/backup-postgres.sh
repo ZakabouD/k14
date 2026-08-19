@@ -96,14 +96,16 @@ mv "${PARTIAL_FILE}" "${FINAL_FILE}"
 # Remove trap trigger for clean exit
 trap - EXIT INT TERM
 
-# Step 4: Generate SHA-256 Checksum
+# Step 4: Generate SHA-256 Checksum (Mandatory)
 echo "[+] Generating SHA-256 checksum..."
 if command -v sha256sum >/dev/null 2>&1; then
     (cd "${BACKUP_DIR}" && sha256sum "${BACKUP_BASENAME}" > "${BACKUP_BASENAME}.sha256")
 elif command -v shasum >/dev/null 2>&1; then
     (cd "${BACKUP_DIR}" && shasum -a 256 "${BACKUP_BASENAME}" > "${BACKUP_BASENAME}.sha256")
 else
-    echo "[-] WARNING: Neither sha256sum nor shasum available to generate checksum." >&2
+    echo "[-] ERROR: Neither sha256sum nor shasum is available. Cannot produce mandatory checksum." >&2
+    rm -f "${FINAL_FILE}"
+    exit 1
 fi
 
 BACKUP_SIZE="$(du -h "${FINAL_FILE}" | cut -f1)"

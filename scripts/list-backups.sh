@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Commercial Attendance Stack - List Available PostgreSQL Backups
-# Displays timestamp, filename, size, and checksum status for all local dumps
+# Displays timestamp, filename, size, and real checksum status for all dumps
 # ==============================================================================
 set -Eeuo pipefail
 
@@ -30,7 +30,7 @@ fi
 echo "====================================================================================================="
 echo " Available PostgreSQL Backups (${BACKUP_DIR})"
 echo "====================================================================================================="
-printf "%-38s | %-10s | %-20s | %-12s\n" "Filename" "Size" "Modified (UTC)" "Checksum"
+printf "%-46s | %-8s | %-19s | %-10s\n" "Filename" "Size" "Modified (UTC)" "Checksum"
 echo "-----------------------------------------------------------------------------------------------------"
 
 for DUMP_FILE in "${DUMPS[@]}"; do
@@ -47,12 +47,27 @@ for DUMP_FILE in "${DUMPS[@]}"; do
     fi
 
     CHECKSUM_FILE="${DUMP_FILE}.sha256"
-    if [[ -f "${CHECKSUM_FILE}" ]]; then
-        CHECKSUM_STATUS="Present (OK)"
+    if [[ ! -f "${CHECKSUM_FILE}" ]]; then
+        CHECKSUM_STATUS="MISSING"
     else
-        CHECKSUM_STATUS="Missing"
+        EXPECTED_HASH="$(awk '{print $1}' "${CHECKSUM_FILE}" 2>/dev/null || echo "")"
+        if command -v sha256sum >/dev/null 2>&1; then
+            ACTUAL_HASH="$(cd "${BACKUP_DIR}" && sha256sum "${FILENAME}" 2>/dev/null | awk '{print $1}')"
+        elif command -v shasum >/dev/null 2>&1; then
+            ACTUAL_HASH="$(cd "${BACKUP_DIR}" && shasum -a 256 "${FILENAME}" 2>/dev/null | awk '{print $1}')"
+        else
+            ACTUAL_HASH="UNCHECKED"
+        fi
+
+        if [[ -n "${EXPECTED_HASH}" && "${EXPECTED_HASH}" == "${ACTUAL_HASH}" ]]; then
+            CHECKSUM_STATUS="VALID"
+        elif [[ "${ACTUAL_HASH}" == "UNCHECKED" ]]; then
+            CHECKSUM_STATUS="PRESENT"
+        else
+            CHECKSUM_STATUS="INVALID"
+        fi
     fi
 
-    printf "%-38s | %-10s | %-20s | %-12s\n" "${FILENAME}" "${SIZE}" "${MOD_TIME}" "${CHECKSUM_STATUS}"
+    printf "%-46s | %-8s | %-19s | %-10s\n" "${FILENAME}" "${SIZE}" "${MOD_TIME}" "${CHECKSUM_STATUS}"
 done
 echo "====================================================================================================="

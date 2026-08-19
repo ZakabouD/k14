@@ -5,6 +5,7 @@ node_modules
 !.env.example
 !.env.worker.example
 !.env.docker.example
+!.env.backup.example
 
 /generated/prisma
 
@@ -14,7 +15,6 @@ scratch/
 .DS_Store
 **/.DS_Store
 *.log
-docs/
 dev/
 
 # Database backups - exclude all dump, partial, and checksum files

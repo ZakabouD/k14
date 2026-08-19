@@ -20,6 +20,10 @@
     "backup": "./scripts/backup-postgres.sh",
     "backup:list": "./scripts/list-backups.sh",
     "backup:restore": "./scripts/restore-postgres.sh",
+    "backup:upload": "./scripts/upload-backup-r2.sh",
+    "backup:remote:list": "./scripts/list-remote-backups.sh",
+    "backup:remote:download": "./scripts/download-backup-r2.sh",
+    "backup:full": "./scripts/backup-full.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
