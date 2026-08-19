@@ -31,7 +31,10 @@ export default function RootLayout({
       <head>
         <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${inter.variable} font-sans antialiased min-h-screen bg-background text-foreground flex`}>
+      <body
+        suppressHydrationWarning
+        className={`${inter.variable} font-sans antialiased min-h-screen bg-background text-foreground flex`}
+      >
         <Sidebar />
         <main className="flex-1 lg:ml-64 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto w-full pt-20 lg:pt-8">
           {children}
