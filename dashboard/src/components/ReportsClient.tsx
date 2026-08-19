@@ -811,7 +811,7 @@ export default function ReportsClient({
                   {/* Peak Hours activity Histogram in Morocco Local Time */}
                   <div className="glass-panel p-6 lg:col-span-2">
                     <h3 className="text-sm font-bold uppercase tracking-wider text-foreground/60 mb-4">
-                      Heures de Pointe à l'Atelier (Pointages par Heure locale)
+                      Heures de Pointe des Pointages (Par Heure locale)
                     </h3>
                     <PeakHoursHistogram data={analytics.peakHours || []} />
                     <div className="text-[11px] text-foreground/50 mt-3 leading-relaxed">

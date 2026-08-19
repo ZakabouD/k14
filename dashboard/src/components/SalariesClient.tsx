@@ -1408,7 +1408,7 @@ export default function SalariesClient({ initialMode, initialDate, initialLabel,
                   <div className="flex justify-between items-start border-b border-slate-200 pb-4">
                     <div>
                       <h3 className="text-xl font-black tracking-tight text-blue-900">{companyName}</h3>
-                      <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mt-0.5">Suivi d'Atelier & Paie</p>
+                      <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mt-0.5">Suivi des Présences & Paie</p>
                     </div>
                     <div className="text-right">
                       <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded border border-slate-200 uppercase tracking-wider">

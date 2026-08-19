@@ -1,7 +1,16 @@
 import { prisma } from "./prisma";
+import {
+  getCompanyTimezone,
+  getCompanyDayStart,
+  getCompanyDayEnd,
+  isCompanySunday,
+  isCompanySaturday,
+  getCompanyTimeMinutes,
+  getLocalDateComponents
+} from "./date-utils";
 
 export interface RawPunchData {
-  id: string;
+  id?: string;
   sn: number;
   zktecoUserId: string;
   recordTime: Date;
@@ -74,11 +83,17 @@ export const serverAnomalyService = new ServerAnomalyService();
 
 export class ServerCalculationService {
   /**
-   * Recalculates reports for all active users across an array of distinct dates.
+   * Recalculates reports for all active users across an array of distinct dates (e.g. from punch sync).
    */
   async calculateDailyReportsForDates(dates: Date[]) {
+    const settings = await prisma.systemSettings.findFirst({
+      select: { timezone: true }
+    });
+    const timezone = getCompanyTimezone(settings?.timezone);
+
+    // Group dates into unique company-local midnight timestamps
     const uniqueDayTimestamps = new Set(
-      dates.map(d => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).getTime())
+      dates.map(d => getCompanyDayStart(d, timezone).getTime())
     );
 
     for (const ts of uniqueDayTimestamps) {
@@ -86,9 +101,17 @@ export class ServerCalculationService {
     }
   }
 
+  /**
+   * Calculates daily reports for all active users for a single company-local date.
+   */
   async calculateDailyReports(date: Date) {
-    const startOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
-    const endOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+    const settings = await prisma.systemSettings.findFirst({
+      select: { timezone: true, gracePeriod: true, otThresholdLimit: true }
+    });
+    const timezone = getCompanyTimezone(settings?.timezone);
+
+    const startOfDay = getCompanyDayStart(date, timezone);
+    const endOfDay = getCompanyDayEnd(date, timezone);
 
     const punches = await prisma.rawPunch.findMany({
       where: {
@@ -114,15 +137,61 @@ export class ServerCalculationService {
 
     for (const user of users) {
       const userPunches = punchesByUser.get(user.zktecoUserId) || [];
-      await this.processUserDailyReport(user as UserWithShift, userPunches, startOfDay);
+      await this.processUserDailyReport(user as UserWithShift, userPunches, startOfDay, timezone, settings);
+    }
+  }
+
+  /**
+   * Recalculates daily reports for a single artisan across a date range.
+   * Preserves RESOLVED reports and updates leaves/holidays/anomalies/overtime consistently.
+   */
+  async recalculateUserRange(userId: string, startDate: Date, endDate: Date) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { shift: true }
+    });
+    if (!user) return;
+
+    const settings = await prisma.systemSettings.findFirst({
+      select: { timezone: true, gracePeriod: true, otThresholdLimit: true }
+    });
+    const timezone = getCompanyTimezone(settings?.timezone);
+
+    const startLocal = getCompanyDayStart(startDate, timezone);
+    const endLocal = getCompanyDayStart(endDate, timezone);
+
+    const current = new Date(startLocal.getTime());
+
+    while (current.getTime() <= endLocal.getTime()) {
+      const dayStart = new Date(current.getTime());
+      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+      const punches = await prisma.rawPunch.findMany({
+        where: {
+          zktecoUserId: user.zktecoUserId,
+          recordTime: {
+            gte: dayStart,
+            lte: dayEnd
+          }
+        },
+        orderBy: { recordTime: "asc" }
+      });
+
+      await this.processUserDailyReport(user as UserWithShift, punches, dayStart, timezone, settings);
+
+      // Advance one day (24 hours UTC)
+      current.setUTCDate(current.getUTCDate() + 1);
     }
   }
 
   private async processUserDailyReport(
     user: UserWithShift,
     punches: RawPunchData[],
-    startOfDay: Date
+    startOfDay: Date,
+    timezone: string,
+    settings: any
   ) {
+    // 1. Check for manual resolution override
     const existingReport = await prisma.calculatedDailyReport.findUnique({
       where: {
         userId_date: {
@@ -136,7 +205,7 @@ export class ServerCalculationService {
       return;
     }
 
-    // 1. Check for approved leave
+    // 2. Check for approved leave (takes precedence)
     const approvedLeave = await prisma.leave.findFirst({
       where: {
         userId: user.id,
@@ -178,7 +247,7 @@ export class ServerCalculationService {
       return;
     }
 
-    // 2. Check for public holiday
+    // 3. Check for public holiday
     const holiday = await prisma.holiday.findFirst({
       where: {
         date: startOfDay
@@ -186,20 +255,16 @@ export class ServerCalculationService {
     });
 
     let anomaly = serverAnomalyService.detectAnomalies(punches);
-
-    const settings = await prisma.systemSettings.findFirst({
-      select: { gracePeriod: true, timezone: true, otThresholdLimit: true }
-    });
-    const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
     const gracePeriod = user.shift ? user.shift.gracePeriod : (settings?.gracePeriod ?? 15);
 
     let firstPunchIn = punches.length > 0 ? punches[0]!.recordTime : null;
     let lastPunchOut = punches.length > 0 ? punches[punches.length - 1]!.recordTime : null;
     let virtualPunchOut = false;
 
+    // Auto-close shift handling
     if (user.shift?.autoClose && punches.length > 0 && firstPunchIn) {
       let baseHours = user.shift.baseHours;
-      if (startOfDay.getDay() === 6) {
+      if (isCompanySaturday(startOfDay, timezone)) {
         baseHours = user.shift.saturdayHours;
       }
       lastPunchOut = new Date(firstPunchIn.getTime() + baseHours * 60 * 60 * 1000);
@@ -207,31 +272,27 @@ export class ServerCalculationService {
       anomaly = { isAnomaly: false, reason: null };
     }
 
+    // Shift start grace period and delay adjustment
     if (firstPunchIn && user.shift) {
-      const localStr = firstPunchIn.toLocaleString("en-US", { timeZone: timezone });
-      const localPunch = new Date(localStr);
-      const punchMinutes = localPunch.getHours() * 60 + localPunch.getMinutes();
-
+      const punchMinutes = getCompanyTimeMinutes(firstPunchIn, timezone);
       const [shiftHrs, shiftMins] = user.shift.startTime.split(":").map(Number);
-      const shiftMinutes = shiftHrs * 60 + shiftMins;
+      const shiftMinutes = (shiftHrs || 0) * 60 + (shiftMins || 0);
 
       const diff = punchMinutes - shiftMinutes;
       if (diff <= gracePeriod) {
-        const adjustedPunch = new Date(localPunch);
-        adjustedPunch.setHours(shiftHrs, shiftMins, 0, 0);
-        const diffMs = localPunch.getTime() - adjustedPunch.getTime();
-        firstPunchIn = new Date(firstPunchIn.getTime() - diffMs);
+        // Tolerated arrival: align first punch exactly to shift start time
+        firstPunchIn = new Date(firstPunchIn.getTime() - diff * 60 * 1000);
       } else {
+        // Penalized delay: deduct integer penalty hours
         const hoursLate = Math.floor(diff / 60);
         const minutesOfHour = diff % 60;
         let penaltyHours = hoursLate;
         if (minutesOfHour > gracePeriod) {
           penaltyHours += 1;
         }
-        const adjustedPunch = new Date(localPunch);
-        adjustedPunch.setHours(shiftHrs + penaltyHours, shiftMins, 0, 0);
-        const diffMs = localPunch.getTime() - adjustedPunch.getTime();
-        firstPunchIn = new Date(firstPunchIn.getTime() - diffMs);
+        const penaltyMinutes = penaltyHours * 60;
+        const adjustedDiff = diff - penaltyMinutes;
+        firstPunchIn = new Date(firstPunchIn.getTime() - adjustedDiff * 60 * 1000);
       }
     }
 
@@ -241,24 +302,26 @@ export class ServerCalculationService {
     let status = anomaly.isAnomaly ? "ANOMALY" : "OK";
     let anomalyReason = anomaly.reason;
 
-    const todayStr = new Date().toLocaleString("en-US", { timeZone: timezone });
-    const localToday = new Date(todayStr);
-    const utcToday = new Date(Date.UTC(localToday.getFullYear(), localToday.getMonth(), localToday.getDate()));
-    const isReportToday = startOfDay.getTime() === utcToday.getTime();
+    // Ongoing work check for today
+    const now = new Date();
+    const todayStart = getCompanyDayStart(now, timezone);
+    const isReportToday = startOfDay.getTime() === todayStart.getTime();
 
     if (isReportToday && anomaly.isAnomaly && punches.length % 2 !== 0) {
       status = "PENDING";
       anomalyReason = null;
     }
 
+    // Holiday absence check
     if (punches.length === 0 && holiday) {
       status = "HOLIDAY";
     }
 
+    // Working hours calculation
     if (!anomaly.isAnomaly && firstPunchIn && lastPunchOut && firstPunchIn !== lastPunchOut) {
       let totalHours = 0;
       if (virtualPunchOut && user.shift) {
-        totalHours = startOfDay.getDay() === 6 ? user.shift.saturdayHours : user.shift.baseHours;
+        totalHours = isCompanySaturday(startOfDay, timezone) ? user.shift.saturdayHours : user.shift.baseHours;
       } else {
         let sumMs = 0;
         for (let i = 0; i < punches.length; i += 2) {
@@ -279,14 +342,17 @@ export class ServerCalculationService {
       }
 
       let baseHours = user.shift?.baseHours || 8.0;
-      if (startOfDay.getDay() === 6) {
+      if (isCompanySaturday(startOfDay, timezone)) {
         baseHours = user.shift ? user.shift.saturdayHours : (baseHours / 2);
       }
 
-      const isRestDay = startOfDay.getDay() === 0 || !!holiday;
+      // Preserved Business Rule: Sundays & Public Holidays are 200% overtime
+      const isRestDayOrHoliday = isCompanySunday(startOfDay, timezone) || !!holiday;
 
-      if (isRestDay) {
+      if (isRestDayOrHoliday) {
         overtime200Hours = totalHours;
+        regularHours = 0;
+        overtime150Hours = 0;
         if (holiday) {
           status = "HOLIDAY";
         }

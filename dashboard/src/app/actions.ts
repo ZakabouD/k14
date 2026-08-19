@@ -5,7 +5,10 @@ import { revalidatePath } from "next/cache";
 import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
+import { headers } from "next/headers";
 import { getSession, createSession, deleteSession } from "@/lib/session";
+import { serverCalculationService } from "@/lib/server-calculation";
+import { loginRateLimiter } from "@/lib/rate-limiter";
 import bcrypt from "bcrypt";
 import { parseContractTypes, parseLeaveTypes } from "../lib/tags";
 
@@ -789,11 +792,36 @@ export async function loginAdmin(formData: FormData) {
   const password = formData.get("password") as string;
 
   if (!email || !password || email.trim().length === 0 || password.length === 0) {
-    return { success: false, error: "Email and password are required" };
+    return { success: false, error: "Email et mot de passe requis" };
   }
 
   if (!validateEmail(email)) {
-    return { success: false, error: "Invalid email format" };
+    return { success: false, error: "Format d'email invalide" };
+  }
+
+  // Retrieve client IP for rate limiting
+  let clientIp = "127.0.0.1";
+  try {
+    const headerList = await headers();
+    const forwardedFor = headerList.get("x-forwarded-for");
+    const realIp = headerList.get("x-real-ip");
+    clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : (realIp || "127.0.0.1");
+  } catch (_) {}
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const rateLimitKey = `${clientIp}_${normalizedEmail}`;
+  const ipKey = `ip_${clientIp}`;
+
+  const rateCheck = loginRateLimiter.isRateLimited(rateLimitKey);
+  const ipCheck = loginRateLimiter.isRateLimited(ipKey);
+
+  if (rateCheck.isBlocked || ipCheck.isBlocked) {
+    const retrySec = Math.max(rateCheck.retryAfterSeconds, ipCheck.retryAfterSeconds);
+    const retryMin = Math.ceil(retrySec / 60);
+    return {
+      success: false,
+      error: `Trop de tentatives de connexion échouées. Veuillez réessayer dans ${retryMin} minute(s).`
+    };
   }
 
   const settings = await prisma.systemSettings.findFirst();
@@ -802,8 +830,13 @@ export async function loginAdmin(formData: FormData) {
   if (settings && settings.adminEmail === email) {
     const isMatch = await bcrypt.compare(password, settings.adminPasswordHash);
     if (!isMatch) {
-      return { success: false, error: "Invalid credentials" };
+      loginRateLimiter.recordFailedAttempt(rateLimitKey);
+      loginRateLimiter.recordFailedAttempt(ipKey);
+      return { success: false, error: "Identifiants invalides" };
     }
+
+    loginRateLimiter.clear(rateLimitKey);
+    loginRateLimiter.clear(ipKey);
 
     await createSession("admin", {
       email: settings.adminEmail,
@@ -826,13 +859,20 @@ export async function loginAdmin(formData: FormData) {
   });
 
   if (!dashboardUser) {
-    return { success: false, error: "Invalid credentials" };
+    loginRateLimiter.recordFailedAttempt(rateLimitKey);
+    loginRateLimiter.recordFailedAttempt(ipKey);
+    return { success: false, error: "Identifiants invalides" };
   }
 
   const isUserMatch = await bcrypt.compare(password, dashboardUser.passwordHash);
   if (!isUserMatch) {
-    return { success: false, error: "Invalid credentials" };
+    loginRateLimiter.recordFailedAttempt(rateLimitKey);
+    loginRateLimiter.recordFailedAttempt(ipKey);
+    return { success: false, error: "Identifiants invalides" };
   }
+
+  loginRateLimiter.clear(rateLimitKey);
+  loginRateLimiter.clear(ipKey);
 
   await createSession(dashboardUser.id, {
     email: dashboardUser.email,
@@ -1404,268 +1444,8 @@ export async function getReportsPreview(startDateStr: string, endDateStr: string
 
 // Recalculation engine helper for user/date ranges
 export async function recalculateUserRange(userId: string, startDate: Date, endDate: Date) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { shift: true }
-  });
-  if (!user) return;
-
-  const settings = await prisma.systemSettings.findFirst({
-    select: { otThresholdLimit: true, gracePeriod: true, timezone: true }
-  });
-  const timezone = settings?.timezone || process.env.TIMEZONE || "Africa/Casablanca";
-  const threshold = settings?.otThresholdLimit ?? 2.0;
-  const gracePeriod = user.shift ? user.shift.gracePeriod : (settings?.gracePeriod ?? 15);
-
-  const current = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
-  const end = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate()));
-
-  while (current <= end) {
-    const startOfDay = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate(), 0, 0, 0, 0));
-    const endOfDay = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate(), 23, 59, 59, 999));
-
-    // A. Check for approved leave (takes precedence over previous manual overrides)
-    const approvedLeave = await prisma.leave.findFirst({
-      where: {
-        userId,
-        status: 'APPROVED',
-        startDate: { lte: startOfDay },
-        endDate: { gte: startOfDay }
-      }
-    });
-
-    if (approvedLeave) {
-      await prisma.calculatedDailyReport.upsert({
-        where: { userId_date: { userId, date: startOfDay } },
-        update: {
-          firstPunchIn: null,
-          lastPunchOut: null,
-          regularHours: 0,
-          overtime150Hours: 0,
-          overtime200Hours: 0,
-          status: 'LEAVE',
-          anomalyReason: null
-        },
-        create: {
-          userId,
-          date: startOfDay,
-          firstPunchIn: null,
-          lastPunchOut: null,
-          regularHours: 0,
-          overtime150Hours: 0,
-          overtime200Hours: 0,
-          status: 'LEAVE',
-          anomalyReason: null
-        }
-      });
-      current.setDate(current.getDate() + 1);
-      continue;
-    }
-
-    // Skip manual overrides if no leave is assigned
-    const existing = await prisma.calculatedDailyReport.findUnique({
-      where: { userId_date: { userId, date: startOfDay } }
-    });
-    if (existing && existing.status === 'RESOLVED') {
-      current.setDate(current.getDate() + 1);
-      continue;
-    }
-
-    // B. Check for public holiday
-    const holiday = await prisma.holiday.findFirst({
-      where: { date: startOfDay }
-    });
-
-    // C. Get punches
-    const punches = await prisma.rawPunch.findMany({
-      where: {
-        zktecoUserId: user.zktecoUserId,
-        recordTime: {
-          gte: startOfDay,
-          lte: endOfDay
-        }
-      },
-      orderBy: { recordTime: 'asc' }
-    });
-
-    // Check anomalies
-    let isAnomaly = false;
-    let anomalyReason: string | null = null;
-    let firstPunchIn = punches.length > 0 ? punches[0]!.recordTime : null;
-    let lastPunchOut = punches.length > 0 ? punches[punches.length - 1]!.recordTime : null;
-    let virtualPunchOut = false;
-
-    if (punches.length > 0) {
-      if (user.shift?.autoClose && punches.length > 0 && firstPunchIn) {
-        let baseHours = user.shift.baseHours;
-        if (startOfDay.getUTCDay() === 6) {
-          baseHours = user.shift.saturdayHours;
-        }
-        lastPunchOut = new Date(firstPunchIn.getTime() + baseHours * 60 * 60 * 1000);
-        virtualPunchOut = true;
-      } else if (punches.length % 2 !== 0) {
-        isAnomaly = true;
-        anomalyReason = 'Odd number of punches. Missing punch out or extra punch in.';
-      } else {
-        const first = punches[0]!;
-        const last = punches[punches.length - 1]!;
-        const hrs = (last.recordTime.getTime() - first.recordTime.getTime()) / (1000 * 60 * 60);
-        if (hrs > 16) {
-          isAnomaly = true;
-          anomalyReason = `Exceedingly long shift duration detected: ${hrs.toFixed(2)} hours.`;
-        } else if (hrs === 0 && punches.length > 1) {
-          isAnomaly = true;
-          anomalyReason = 'Multiple punches recorded at the exact same time.';
-        }
-      }
-    }
-
-    if (firstPunchIn && user.shift) {
-      const punchStr = firstPunchIn.toLocaleString("en-US", { timeZone: timezone });
-      const localPunch = new Date(punchStr);
-      const punchMinutes = localPunch.getHours() * 60 + localPunch.getMinutes();
-      
-      const [shiftHrs, shiftMins] = user.shift.startTime.split(":").map(Number);
-      const shiftMinutes = shiftHrs * 60 + shiftMins;
-      
-      const diff = punchMinutes - shiftMinutes;
-      if (diff <= gracePeriod) {
-        // Tolerated delay or early arrival: start time is exactly the shift start time
-        const adjustedPunch = new Date(localPunch);
-        adjustedPunch.setHours(shiftHrs, shiftMins, 0, 0);
-        const diffMs = localPunch.getTime() - adjustedPunch.getTime();
-        firstPunchIn = new Date(firstPunchIn.getTime() - diffMs);
-      } else {
-        // Penalized delay: lose the first hour(s)
-        const hoursLate = Math.floor(diff / 60);
-        const minutesOfHour = diff % 60;
-        
-        let penaltyHours = hoursLate;
-        if (minutesOfHour > gracePeriod) {
-          penaltyHours += 1;
-        }
-        
-        const adjustedPunch = new Date(localPunch);
-        adjustedPunch.setHours(shiftHrs + penaltyHours, shiftMins, 0, 0);
-        const diffMs = localPunch.getTime() - adjustedPunch.getTime();
-        firstPunchIn = new Date(firstPunchIn.getTime() - diffMs);
-      }
-    }
-
-    // Exits ("OUT") are not adjusted, ensuring employees get paid for exact minutes worked
-
-    let regularHours = 0;
-    let overtime150Hours = 0;
-    let overtime200Hours = 0;
-    let status: 'OK' | 'ANOMALY' | 'PENDING' | 'LEAVE' | 'HOLIDAY' = isAnomaly ? 'ANOMALY' : 'OK';
-
-    // If the report date is today and they have an odd number of punches, it is not an anomaly (they are currently working)
-    const todayStr = new Date().toLocaleString("en-US", { timeZone: timezone });
-    const localToday = new Date(todayStr);
-    const utcToday = new Date(Date.UTC(localToday.getFullYear(), localToday.getMonth(), localToday.getDate()));
-    const isReportToday = startOfDay.getTime() === utcToday.getTime();
-
-    if (isReportToday && isAnomaly && punches.length % 2 !== 0) {
-      status = 'PENDING';
-      anomalyReason = null;
-    }
-
-    if (punches.length === 0 && holiday) {
-      status = 'HOLIDAY';
-      regularHours = 0;
-      overtime150Hours = 0;
-      overtime200Hours = 0;
-    }
-
-    if (!isAnomaly && firstPunchIn && lastPunchOut && firstPunchIn !== lastPunchOut) {
-      let totalHours = 0;
-      if (virtualPunchOut && user.shift) {
-        totalHours = startOfDay.getUTCDay() === 6 ? user.shift.saturdayHours : user.shift.baseHours;
-      } else {
-        let sumMs = 0;
-        for (let i = 0; i < punches.length; i += 2) {
-          if (punches[i] && punches[i + 1]) {
-            let pStart = punches[i].recordTime.getTime();
-            let pEnd = punches[i + 1].recordTime.getTime();
-            if (i === 0 && firstPunchIn) {
-              pStart = firstPunchIn.getTime();
-            }
-            sumMs += Math.max(0, pEnd - pStart);
-          }
-        }
-        const rawHours = sumMs / (1000 * 60 * 60);
-        const lunchBreakMinutes = user.shift?.lunchBreak ?? 0;
-        totalHours = (punches.length === 2 && rawHours > 5.0 && lunchBreakMinutes > 0)
-          ? Math.max(0, rawHours - (lunchBreakMinutes / 60))
-          : rawHours;
-      }
-
-      let baseHours = user.shift?.baseHours || 8.0;
-      
-      // Saturday is a half working day (half standard base hours)
-      if (startOfDay.getUTCDay() === 6) {
-        baseHours = user.shift ? user.shift.saturdayHours : (baseHours / 2);
-      }
-
-      const isSunday = startOfDay.getUTCDay() === 0;
-
-      if (isSunday) {
-        // Sunday is rest day -> All worked hours on Sunday are 200% overtime
-        overtime200Hours = totalHours;
-        regularHours = 0;
-        overtime150Hours = 0;
-        if (holiday) {
-          status = 'HOLIDAY';
-        }
-      } else if (holiday) {
-        // Weekday Public Holiday (e.g. Fête du Trône): Worked hours on holiday are 150% overtime
-        status = 'HOLIDAY';
-        regularHours = 0;
-        overtime150Hours = totalHours;
-        overtime200Hours = 0;
-      } else {
-        // Normal Working Day
-        if (totalHours <= baseHours) {
-          regularHours = totalHours;
-        } else {
-          regularHours = baseHours;
-          const overtime = totalHours - baseHours;
-          if (overtime <= threshold) {
-            overtime150Hours = overtime;
-          } else {
-            overtime150Hours = threshold;
-            overtime200Hours = overtime - threshold;
-          }
-        }
-      }
-    }
-
-    await prisma.calculatedDailyReport.upsert({
-      where: { userId_date: { userId, date: startOfDay } },
-      update: {
-        firstPunchIn,
-        lastPunchOut,
-        regularHours,
-        overtime150Hours,
-        overtime200Hours,
-        status,
-        anomalyReason
-      },
-      create: {
-        userId,
-        date: startOfDay,
-        firstPunchIn,
-        lastPunchOut,
-        regularHours,
-        overtime150Hours,
-        overtime200Hours,
-        status,
-        anomalyReason
-      }
-    });
-
-    current.setDate(current.getDate() + 1);
-  }
+  await verifyAuth();
+  await serverCalculationService.recalculateUserRange(userId, startDate, endDate);
 }
 
 // Leaves CRUD Actions

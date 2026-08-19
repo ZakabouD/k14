@@ -33,7 +33,7 @@ export default function LoginPage() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4 shadow-[0_0_20px_var(--primary-glow)]">
             <Clock className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">Pointage & Paie <span className="text-primary font-medium">Atelier</span></h1>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Pointage & Paie <span className="text-primary font-medium">Professionnel</span></h1>
           <p className="text-foreground/50 text-sm mt-1">Connectez-vous à votre espace d'administration</p>
         </div>
 

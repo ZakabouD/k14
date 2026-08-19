@@ -90,7 +90,7 @@ export function Sidebar() {
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-xs tracking-tight text-foreground leading-tight truncate max-w-[140px]">{companyName}</span>
-            <span className="text-primary font-semibold text-[9px] tracking-wider uppercase leading-none mt-0.5">Suivi d'Atelier</span>
+            <span className="text-primary font-semibold text-[9px] tracking-wider uppercase leading-none mt-0.5">Suivi RH & Paie</span>
           </div>
         </div>
         <button 
@@ -119,7 +119,7 @@ export function Sidebar() {
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-sm tracking-tight text-foreground leading-tight truncate max-w-[160px]">{companyName}</span>
-            <span className="text-primary font-semibold text-[10px] tracking-wider uppercase leading-none mt-0.5">Suivi d'Atelier</span>
+            <span className="text-primary font-semibold text-[10px] tracking-wider uppercase leading-none mt-0.5">Suivi RH & Paie</span>
           </div>
         </div>
         

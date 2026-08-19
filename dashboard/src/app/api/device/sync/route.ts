@@ -68,22 +68,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Ensure all punch users have at least a baseline employee record
+    // Ensure all punch users have at least a baseline employee record atomically
     const uniqueUserIds = [...new Set(records.map((r: any) => String(r.zktecoUserId || r.user_id || "").trim()))].filter(Boolean);
     for (const uid of uniqueUserIds) {
-      const existing = await prisma.user.findUnique({
-        where: { zktecoUserId: uid },
-        select: { id: true }
-      });
-      if (!existing) {
-        await prisma.user.create({
-          data: {
+      try {
+        await prisma.user.upsert({
+          where: { zktecoUserId: uid },
+          update: {}, // Preserve all existing HR fields
+          create: {
             zktecoUserId: uid,
             firstName: "Employé",
             lastName: uid,
             isActive: true
           }
         });
+      } catch (err: any) {
+        // If a concurrent sync created the user in the exact same millisecond, ignore P2002 safely
+        if (err.code !== "P2002") {
+          throw err;
+        }
       }
     }
 
@@ -206,7 +209,7 @@ export async function POST(request: NextRequest) {
     } catch (_) {}
 
     return NextResponse.json(
-      { error: "Internal server error during synchronization", details: error.message || String(error) },
+      { success: false, error: "Internal synchronization error" },
       { status: 500 }
     );
   }
