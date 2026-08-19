@@ -11,5 +11,9 @@ scratch/
 .DS_Store
 **/.DS_Store
 *.log
-task.md
 
+# Ignore all markdown documentation files
+*.md
+**/*.md
+docs/
+dev/
