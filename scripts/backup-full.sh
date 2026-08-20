@@ -2,14 +2,52 @@
 # ==============================================================================
 # Commercial Attendance Stack - Unified Full Backup Workflow
 # Executes local atomic verified backup + optional Cloudflare R2 off-site sync
+# Includes non-blocking concurrency locking (flock/atomic lock) and failure alerting
 # ==============================================================================
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-ENV_BACKUP="${ROOT_DIR}/.env.backup"
-ENV_DOCKER="${ROOT_DIR}/.env.docker"
+# ==============================================================================
+# CONCURRENCY CONTROL (flock / portable atomic lock)
+# ==============================================================================
+LOCK_DIR="/tmp/zk_commercial_backup.lock.d"
+LOCK_FILE="/tmp/zk_commercial_backup.lock"
+
+if command -v flock >/dev/null 2>&1; then
+    exec 200>"${LOCK_FILE}"
+    if ! flock -n 200; then
+        echo "[-] [LOCK] Another backup pipeline process is already running. Exiting safely to prevent concurrency." >&2
+        exit 0
+    fi
+else
+    # Portable atomic directory lock fallback (POSIX compliant for macOS/BSD)
+    if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
+        if [[ -f "${LOCK_DIR}/pid" ]]; then
+            EXISTING_PID="$(cat "${LOCK_DIR}/pid" 2>/dev/null || echo "")"
+            if [[ -n "${EXISTING_PID}" ]] && kill -0 "${EXISTING_PID}" 2>/dev/null; then
+                echo "[-] [LOCK] Another backup pipeline process (PID ${EXISTING_PID}) is already running. Exiting safely." >&2
+                exit 0
+            fi
+        fi
+        rm -rf "${LOCK_DIR}" 2>/dev/null || true
+        mkdir "${LOCK_DIR}" 2>/dev/null || exit 0
+    fi
+    echo "$$" > "${LOCK_DIR}/pid"
+fi
+
+# Pipeline cleanup and failure notification handler
+on_pipeline_exit() {
+    local exit_code=$?
+    if [[ ! command -v flock >/dev/null 2>&1 ]]; then
+        rm -rf "${LOCK_DIR}" 2>/dev/null || true
+    fi
+    if [[ ${exit_code} -ne 0 ]]; then
+        "${SCRIPT_DIR}/notify-backup-failure.sh" "full_pipeline" "Unified backup pipeline failed" "${exit_code}" || true
+    fi
+}
+trap on_pipeline_exit EXIT INT TERM
 
 echo "============================================================"
 echo " Starting Full Backup Pipeline"

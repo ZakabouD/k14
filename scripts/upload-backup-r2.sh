@@ -36,9 +36,22 @@ BACKUP_REMOTE_ENABLED="${BACKUP_REMOTE_ENABLED:-false}"
 BACKUP_CLIENT_ID="${BACKUP_CLIENT_ID:-client-default}"
 BACKUP_REMOTE_RETENTION_DAYS="${BACKUP_REMOTE_RETENTION_DAYS:-30}"
 
+# Error handler & notification
+on_upload_error() {
+    local exit_code=$?
+    if [[ ${exit_code} -ne 0 ]]; then
+        if [[ -n "${LOCAL_MARKER_PATH:-}" && -f "${LOCAL_MARKER_PATH}" ]]; then
+            rm -f "${LOCAL_MARKER_PATH}"
+        fi
+        "${SCRIPT_DIR}/notify-backup-failure.sh" "r2_upload" "R2 upload or remote verification failed" "${exit_code}" || true
+    fi
+}
+trap on_upload_error EXIT INT TERM
+
 # If remote backup is disabled, exit gracefully
 if [[ "${BACKUP_REMOTE_ENABLED}" != "true" ]]; then
     echo "[i] Off-site R2 backup is disabled (BACKUP_REMOTE_ENABLED=${BACKUP_REMOTE_ENABLED}). Skipping remote upload."
+    trap - EXIT INT TERM
     exit 0
 fi
 
@@ -64,6 +77,36 @@ if [[ ! -f "${LOCAL_SHA_PATH}" ]]; then
     echo "[-] ERROR: Local checksum file '${LOCAL_SHA_PATH}' not found. Cannot upload unverified backup." >&2
     exit 1
 fi
+
+# ==============================================================================
+# DEFENSE IN DEPTH: REVALIDATE LOCAL ARCHIVE & CHECKSUM BEFORE UPLOAD
+# ==============================================================================
+echo "[+] Pre-upload verification: validating local checksum and archive integrity..."
+if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL_LOCAL_HASH="$(sha256sum "${LOCAL_DUMP_PATH}" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+    ACTUAL_LOCAL_HASH="$(shasum -a 256 "${LOCAL_DUMP_PATH}" | awk '{print $1}')"
+else
+    echo "[-] ERROR: sha256sum or shasum tool missing." >&2
+    exit 1
+fi
+
+EXPECTED_LOCAL_HASH="$(awk '{print $1}' "${LOCAL_SHA_PATH}")"
+if [[ "${ACTUAL_LOCAL_HASH}" != "${EXPECTED_LOCAL_HASH}" ]]; then
+    echo "[-] PRE-UPLOAD INTEGRITY ERROR: Local file hash does not match sidecar .sha256 file!" >&2
+    echo "[-] Expected: ${EXPECTED_LOCAL_HASH}" >&2
+    echo "[-] Actual:   ${ACTUAL_LOCAL_HASH}" >&2
+    exit 1
+fi
+
+# Structural validation via pg_restore --list if container running
+if docker ps --filter "name=^/zk_postgres$" --filter "status=running" --format '{{.Names}}' | grep -q "^zk_postgres$"; then
+    if ! docker exec -i zk_postgres pg_restore --list < "${LOCAL_DUMP_PATH}" >/dev/null 2>&1; then
+        echo "[-] PRE-UPLOAD INTEGRITY ERROR: pg_restore --list failed on local archive." >&2
+        exit 1
+    fi
+fi
+echo "[+] Local archive pre-validation PASSED."
 
 # Validate client identifier format (strictly no path traversal)
 if [[ ! "${BACKUP_CLIENT_ID}" =~ ^[A-Za-z0-9_-]{1,64}$ ]]; then
@@ -108,7 +151,7 @@ REMOTE_SHA_KEY="${REMOTE_PREFIX}/${DUMP_BASENAME}.sha256"
 REMOTE_MARKER_KEY="${REMOTE_PREFIX}/${DUMP_BASENAME}.complete"
 
 LOCAL_SIZE_BYTES="$(stat -f "%z" "${LOCAL_DUMP_PATH}" 2>/dev/null || stat -c "%s" "${LOCAL_DUMP_PATH}" 2>/dev/null || echo "0")"
-SHA256_HASH="$(awk '{print $1}' "${LOCAL_SHA_PATH}")"
+SHA256_HASH="${ACTUAL_LOCAL_HASH}"
 TIMESTAMP_UTC="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 # Create atomic completion marker file locally
@@ -202,6 +245,9 @@ if [[ "${BACKUP_REMOTE_RETENTION_DAYS}" -gt 0 ]]; then
         done
     fi
 fi
+
+# Remove error trap on success
+trap - EXIT INT TERM
 
 echo "============================================================"
 echo " OFF-SITE R2 BACKUP SUCCESS"

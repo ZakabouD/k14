@@ -1,8 +1,8 @@
-# PostgreSQL Backup & Disaster Recovery Runbook
+# PostgreSQL Backup, Off-Site Replication & Disaster Recovery Runbook
 
 **Attendance System — Commercial Edition**
 
-This runbook documents the architecture, automated scheduling, manual operations, and disaster recovery procedures for PostgreSQL backups.
+This runbook documents the architecture, automated scheduling, manual operations, security isolation, and disaster recovery procedures for PostgreSQL backups.
 
 ---
 
@@ -11,11 +11,13 @@ This runbook documents the architecture, automated scheduling, manual operations
 ```mermaid
 graph TD
     subgraph VPS["Client VPS (1 Client = 1 VPS)"]
+        LOCK["flock Concurrency Lock\n(/tmp/zk_commercial_backup.lock)"]
         PG[("PostgreSQL Database\n(zk_postgres:5432)")]
         LOCAL_SCRIPT["backup-postgres.sh"]
         DUMP[("Local Atomic Dump\nbackups/postgres/*.dump")]
         SHA["SHA-256 Checksum\n*.dump.sha256"]
-        CRON["Host Cron Job\n(0 3 * * *)"]
+        SCHEDULER["systemd Timer / Host Cron\n(03:00 Africa/Casablanca)"]
+        ALERT["notify-backup-failure.sh\n(Optional Webhook)"]
     end
 
     subgraph Cloudflare["Cloudflare R2 Storage (Off-Site S3)"]
@@ -25,29 +27,32 @@ graph TD
         R2_MARKER["*.dump.complete"]
     end
 
-    CRON --> LOCAL_SCRIPT
+    SCHEDULER --> LOCK
+    LOCK --> LOCAL_SCRIPT
     PG -->|pg_dump -Fc| LOCAL_SCRIPT
     LOCAL_SCRIPT --> DUMP
     LOCAL_SCRIPT --> SHA
     LOCAL_SCRIPT -->|upload-backup-r2.sh| R2_BUCKET
+    LOCAL_SCRIPT -.->|On Failure| ALERT
     R2_BUCKET --> R2_DUMP
     R2_BUCKET --> R2_SHA
     R2_BUCKET --> R2_MARKER
 ```
 
-### Core Principles
-- **One Client = One VPS:** Each client installation maintains its own isolated database, local backup archive, and dedicated R2 prefix (`<BACKUP_CLIENT_ID>/postgres/YYYY/MM/`).
-- **Atomic Creation:** Dumps are written to `.dump.partial` first, validated with `pg_restore --list`, and atomically renamed only upon validation.
-- **Mandatory Integrity:** Every backup is accompanied by a SHA-256 sidecar (`.dump.sha256`).
-- **Off-Site Atomicity:** Remote uploads place `.dump`, `.sha256`, and a final `.complete` JSON metadata marker, verifying remote existence and byte size.
-- **Active Database Protection:** Restore scripts explicitly refuse to overwrite the live active database (`POSTGRES_DB`).
+### Core Architecture & Safety Principles
+- **One Client = One VPS:** Each client installation maintains its own isolated PostgreSQL database, local backup archive, and dedicated R2 prefix (`<BACKUP_CLIENT_ID>/postgres/YYYY/MM/`).
+- **Atomic Creation:** Dumps are written to `.dump.partial` first, verified via `pg_restore --list`, and atomically renamed only upon validation.
+- **Mandatory Integrity:** Every backup requires a valid SHA-256 sidecar (`.dump.sha256`).
+- **Model A Authoritative Completion Marker:** Remote uploads place `.dump`, `.sha256`, and an atomic `.complete` JSON metadata marker. A backup is only deemed complete remotely when all 3 objects exist and match in size and checksum.
+- **Concurrency Locking (`flock`):** Automated runs acquire a non-blocking lock to prevent overlapping backup executions.
+- **Active Database Overwrite Protection:** Restore tools explicitly refuse to restore over the active application database (`POSTGRES_DB`).
 
 ---
 
 ## 2. Configuration & Credentials
 
 ### Local Environment (`.env.docker`)
-Contains PostgreSQL connection details used by the Docker stack:
+Contains PostgreSQL connection details used by Docker Compose:
 ```bash
 POSTGRES_DB=attendance
 POSTGRES_USER=attendance_user
@@ -66,11 +71,12 @@ Configure the following parameters:
 BACKUP_REMOTE_ENABLED=true
 
 # Unique client identifier for logical bucket isolation
+# Strictly alphanumeric, hyphens, and underscores (max 64 chars)
 BACKUP_CLIENT_ID=client-acme-casablanca
 
 # Cloudflare R2 Credentials
 R2_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-R2_BUCKET=attendance-commercial-backups
+R2_BUCKET=zk-k14-commercial-backups
 R2_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 R2_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 R2_ENDPOINT=https://xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.r2.cloudflarestorage.com
@@ -78,6 +84,9 @@ R2_ENDPOINT=https://xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.r2.cloudflarestorage.com
 # Retention (in days)
 BACKUP_LOCAL_RETENTION_DAYS=7
 BACKUP_REMOTE_RETENTION_DAYS=30
+
+# Optional Failure Alert Webhook
+BACKUP_ALERT_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
 > [!CAUTION]
@@ -85,141 +94,172 @@ BACKUP_REMOTE_RETENTION_DAYS=30
 
 ---
 
-## 3. Automated Daily Scheduling
+## 3. Client Isolation & R2 Permissions Model
 
-For a single-tenant VPS (`1 client = 1 VPS`), **host cron** provides the simplest, most reliable execution mechanism without adding container daemon complexity.
+### Application-Level vs Credential-Level Isolation
+- **Application-Level Prefix Isolation (Enforced by Scripts):** All scripts (`upload-backup-r2.sh`, `download-backup-r2.sh`, `list-remote-backups.sh`) strictly enforce the `${BACKUP_CLIENT_ID}/postgres/` prefix. Any download or list operation targeting a different client prefix is rejected before making S3 calls.
+- **Cloudflare R2 API Token Scope (Credential-Level):** Cloudflare R2 API Tokens currently support **Bucket-level** read/write scoping (e.g. restricted only to `zk-k14-commercial-backups`), but do not support granular path/prefix IAM policies inside a single bucket. Therefore, defense in depth is provided by combining restricted API tokens with application-level prefix enforcement.
 
-### Recommended Cron Setup
-Schedule backups at **03:00 AM** local company time (e.g. `Africa/Casablanca`):
+---
 
-Edit host crontab:
+## 4. Automated Production Scheduling
+
+The automated scheduler is configured to trigger daily at **03:00 Africa/Casablanca** company time.
+
+### Installing the Schedule (Idempotent Installer)
+
+Run the included schedule installer:
 ```bash
-crontab -e
+# Option A: Systemd Timer (Recommended on Linux VPS)
+sudo npm run backup:schedule -- --systemd
+
+# Option B: Host Cron (with explicit CRON_TZ=Africa/Casablanca)
+npm run backup:schedule -- --cron
 ```
 
-Add the following entry:
-```cron
-# Daily automated attendance backup at 03:00 AM (local + off-site R2 upload)
-0 3 * * * cd /opt/attendance/zk-k14-commercial && /usr/bin/npm run backup:full >> /var/log/attendance-backup.log 2>&1
+### Checking Schedule & Logs
+```bash
+# Check status via helper
+npm run backup:schedule -- --status
+
+# Check systemd timer directly
+systemctl list-timers zk-commercial-backup.timer
+
+# View backup execution logs in journald
+journalctl -u zk-commercial-backup.service -n 50 --no-pager
+```
+
+### Removing / Uninstalling Schedule
+```bash
+npm run backup:schedule -- --uninstall
 ```
 
 ---
 
-## 4. Operational Commands Cheat Sheet
+## 5. Operational Commands Cheat Sheet
 
-### Create a Local Verified Backup
+### 1. Create a Local Verified Backup
 ```bash
 npm run backup
 ```
 
-### Create a Full Backup (Local + Off-Site R2 Upload)
+### 2. Create a Full Backup (Local + Off-Site R2 Sync)
 ```bash
 npm run backup:full
 ```
 
-### List Local Backups
+### 3. List Local Backups
 ```bash
 npm run backup:list
 ```
-*Output displays filename, size, timestamp, and live SHA-256 checksum status (`VALID`, `INVALID`, or `MISSING`).*
 
-### List Remote R2 Backups
+### 4. List Remote R2 Backups
 ```bash
 npm run backup:remote:list
 ```
+*Output displays status: `COMPLETE` vs `INCOMPLETE`.*
 
-### Download a Remote Backup from R2
+### 5. Download a Remote Backup from R2
 ```bash
-npm run backup:remote:download -- <REMOTE_KEY_OR_FILENAME>
+npm run backup:remote:download -- <DUMP_FILENAME_OR_KEY>
 ```
 
-### Verify & Test-Restore a Backup
-Restores into an isolated temporary validation database (`attendance_restore_test_<TIMESTAMP>`) without touching production:
+### 6. Test-Restore into an Isolated Validation Database
+Restores into a temporary database without touching production:
 ```bash
-npm run backup:restore -- backups/postgres/attendance_2026-08-19_194824Z.dump
+npm run backup:restore -- backups/postgres/<DUMP_FILE> [target_db_name] [--keep|--drop]
 ```
 
 ---
 
-## 5. Disaster Recovery Procedure
+## 6. Disaster Recovery & Production Restoration
 
-In the event of total server loss, hardware failure, or VPS destruction:
-
-### Step 1: Provision New VPS & Clone Repository
+### Disaster Recovery Drill (Into Temporary Validation DB)
 ```bash
-git clone https://github.com/ZakabouD/k14.git /opt/attendance/zk-k14-commercial
-cd /opt/attendance/zk-k14-commercial
-git checkout commercial
+# 1. Download backup
+npm run backup:remote:download -- attendance_2026-08-19_212910Z.dump
+
+# 2. Restore into isolated test DB and retain for query validation
+./scripts/restore-postgres.sh backups/postgres/attendance_2026-08-19_212910Z.dump attendance_dr_test --keep
+
+# 3. Query and inspect restored tables in attendance_dr_test
+docker exec zk_postgres psql -U attendance_admin -d attendance_dr_test -c "SELECT count(*) FROM \"User\";"
+
+# 4. Clean up temporary DR test database after inspection:
+docker exec zk_postgres psql -U attendance_admin -d postgres -c "DROP DATABASE IF EXISTS \"attendance_dr_test\";"
 ```
 
-### Step 2: Configure Environment Files
+### Production Full Database Ingestion (Controlled Bare-Metal Recovery)
+When restoring a completely new production VPS:
 ```bash
-cp .env.docker.example .env.docker
-cp .env.backup.example .env.backup
-# Populate .env.docker and .env.backup with client credentials
-```
-
-### Step 3: Launch Clean Docker Stack
-```bash
-npm run docker:up
-```
-*This starts PostgreSQL, runs Prisma migrations, starts the Dashboard, and starts Caddy.*
-
-### Step 4: Download Latest Backup from Cloudflare R2
-```bash
-npm run backup:remote:list
-npm run backup:remote:download -- <LATEST_BACKUP_FILENAME>
-```
-
-### Step 5: Verify Downloaded Backup in Validation Database
-```bash
-npm run backup:restore -- backups/postgres/<DOWNLOADED_BACKUP_FILE>.dump
-```
-*Confirm all tables (SystemSettings, User, Shift, Device, RawPunch, CalculatedDailyReport) show expected row counts.*
-
-### Step 6: Perform Production Data Ingestion (Controlled Production Migration)
-Once verified in the test database, stop the dashboard temporarily to prevent writes, restore into the primary database, and restart:
-```bash
-# 1. Stop dashboard & Caddy to prevent traffic during restore
+# 1. Stop dashboard to prevent incoming web traffic during data load
 docker compose --env-file .env.docker stop dashboard caddy
 
-# 2. Ingest verified dump into primary database
-docker exec -i zk_postgres pg_restore -U attendance_user -d attendance --clean --if-exists --no-owner --no-privileges < backups/postgres/<DOWNLOADED_BACKUP_FILE>.dump
+# 2. Extract database credentials dynamically from .env.docker
+POSTGRES_USER="$(grep -E '^POSTGRES_USER=' .env.docker | cut -d '=' -f2- | tr -d '\r\n"')"
+POSTGRES_DB="$(grep -E '^POSTGRES_DB=' .env.docker | cut -d '=' -f2- | tr -d '\r\n"')"
 
-# 3. Restart application stack
+# 3. Ingest verified dump into primary database
+docker exec -i zk_postgres pg_restore -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --clean --if-exists --no-owner --no-privileges < backups/postgres/<DUMP_FILE>
+
+# 4. Restart full application stack
 npm run docker:up
 ```
 
 ---
 
-## 6. Critical Operational Warnings
+## 7. Local & Temporary Artifact Cleanup
+
+To clean up old local test dumps or temporary verification databases safely:
+
+### 1. Drop Temporary DR Databases
+```bash
+# Only drop databases explicitly named as test databases (never POSTGRES_DB)
+docker exec zk_postgres psql -U attendance_admin -d postgres -c "DROP DATABASE IF EXISTS \"attendance_dr_test\";"
+```
+
+### 2. Clean Local Test Backup Files
+```bash
+# Remove specific old test dump files from backups/postgres/
+rm -f backups/postgres/attendance_local_test_*.dump
+rm -f backups/postgres/attendance_local_test_*.dump.sha256
+rm -f backups/postgres/attendance_local_test_*.dump.complete
+```
+
+---
+
+## 8. Credential Rotation Procedure
+
+### Rotating Cloudflare R2 API Tokens
+1. Log in to Cloudflare Dashboard $\rightarrow$ **R2** $\rightarrow$ **Manage R2 API Tokens**.
+2. Click **Create API Token**:
+   - Permissions: **Object Read & Write**
+   - Bucket: Restrict to `zk-k14-commercial-backups`
+   - TTL: As desired (e.g. 1 year)
+3. Copy the new **Access Key ID** and **Secret Access Key**.
+4. Edit `.env.backup` on the host VPS and update:
+   ```bash
+   R2_ACCESS_KEY_ID=<new_key>
+   R2_SECRET_ACCESS_KEY=<new_secret>
+   ```
+5. Test connectivity:
+   ```bash
+   npm run backup:remote:list
+   ```
+6. Revoke the old API Token in the Cloudflare Dashboard.
+
+---
+
+## 9. Critical Operational Warnings
 
 > [!WARNING]
 > **DANGER — `docker compose down -v`**
-> Running `docker compose down -v` permanently **DELETES** the PostgreSQL named database volume (`zk_commercial_postgres_data`) and Caddy certificate storage.
+> Running `docker compose down -v` permanently **DELETES** the PostgreSQL database volume (`zk_commercial_postgres_data`) and Caddy certificate storage.
 > 
-> **NEVER run `docker compose down -v` on a production VPS.**
+> **NEVER run `docker compose down -v` in production.**
 > 
 > Safe production shutdown command:
 > ```bash
 > npm run docker:down
 > # (or: docker compose --env-file .env.docker down)
 > ```
-
----
-
-## 7. Credential Rotation & Administration
-
-### How to Retrieve Auto-Generated Initial Admin Password
-If `ADMIN_PASSWORD` was omitted during first deployment, a secure 24-character password was generated during migration seed:
-```bash
-docker compose --env-file .env.docker logs migrate | grep "Generated Secure Admin Password"
-```
-
-### How to Rotate Cloudflare R2 API Tokens
-1. Generate a new API token in Cloudflare Dashboard (`R2` $\rightarrow$ `Manage R2 API Tokens`).
-2. Update `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in `.env.backup`.
-3. Verify connectivity with:
-   ```bash
-   npm run backup:remote:list
-   ```

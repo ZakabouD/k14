@@ -1,0 +1,15 @@
+[Unit]
+Description=Commercial Attendance Database Backup & Off-Site R2 Sync
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=__PROJECT_ROOT__
+ExecStart=__PROJECT_ROOT__/scripts/backup-full.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zk-attendance-backup
+
+[Install]
+WantedBy=multi-user.target

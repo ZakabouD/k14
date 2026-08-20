@@ -62,11 +62,15 @@ echo " Container: ${CONTAINER_NAME}"
 echo " Target:    ${FINAL_FILE}"
 echo "============================================================"
 
-# Ensure cleanup of partial file on unexpected termination
+# Ensure cleanup of partial file and notify on unexpected failure
 cleanup_partial() {
-    if [[ -f "${PARTIAL_FILE}" ]]; then
-        echo "[-] Cleaning up incomplete partial backup: ${PARTIAL_FILE}" >&2
-        rm -f "${PARTIAL_FILE}"
+    local exit_code=$?
+    if [[ ${exit_code} -ne 0 ]]; then
+        if [[ -f "${PARTIAL_FILE}" ]]; then
+            echo "[-] Cleaning up incomplete partial backup: ${PARTIAL_FILE}" >&2
+            rm -f "${PARTIAL_FILE}"
+        fi
+        "${SCRIPT_DIR}/notify-backup-failure.sh" "local_postgres_backup" "pg_dump or local validation failed" "${exit_code}" || true
     fi
 }
 trap cleanup_partial EXIT INT TERM

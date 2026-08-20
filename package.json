@@ -24,6 +24,7 @@
     "backup:remote:list": "./scripts/list-remote-backups.sh",
     "backup:remote:download": "./scripts/download-backup-r2.sh",
     "backup:full": "./scripts/backup-full.sh",
+    "backup:schedule": "./scripts/install-backup-schedule.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

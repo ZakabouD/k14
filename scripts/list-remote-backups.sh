@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Commercial Attendance Stack - List Remote Cloudflare R2 Backups
-# Lists available remote dumps, sizes, timestamps, and completion marker status
+# Lists remote backups under the client namespace and distinguishes COMPLETE vs INCOMPLETE
 # ==============================================================================
 set -Eeuo pipefail
 
@@ -30,6 +30,12 @@ fi
 
 BACKUP_CLIENT_ID="${BACKUP_CLIENT_ID:-client-default}"
 
+# Validate client identifier format
+if [[ ! "${BACKUP_CLIENT_ID}" =~ ^[A-Za-z0-9_-]{1,64}$ ]]; then
+    echo "[-] ERROR: Invalid BACKUP_CLIENT_ID '${BACKUP_CLIENT_ID}'." >&2
+    exit 1
+fi
+
 if [[ -z "${R2_BUCKET:-}" ]] || [[ -z "${R2_ACCESS_KEY_ID:-}" ]] || [[ -z "${R2_SECRET_ACCESS_KEY:-}" ]]; then
     echo "[-] ERROR: R2 credentials or bucket missing in environment configuration." >&2
     exit 1
@@ -48,22 +54,45 @@ export AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}"
 export AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}"
 export AWS_DEFAULT_REGION="auto"
 
-echo "=========================================================================================================="
+CLIENT_PREFIX="${BACKUP_CLIENT_ID}/postgres/"
+
+echo "================================================================================================================================="
 echo " Available Cloudflare R2 Remote Backups (Bucket: ${R2_BUCKET}, Client: ${BACKUP_CLIENT_ID})"
-echo "=========================================================================================================="
-printf "%-56s | %-10s | %-20s\n" "Remote Key" "Size" "Last Modified"
-echo "----------------------------------------------------------------------------------------------------------"
+echo "================================================================================================================================="
+printf "%-62s | %-10s | %-20s | %-16s\n" "Remote Key" "Size" "Last Modified" "Status"
+echo "---------------------------------------------------------------------------------------------------------------------------------"
 
-OBJECTS="$(aws s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${BACKUP_CLIENT_ID}/postgres/" --endpoint-url "${R2_ENDPOINT}" --query "Contents[?ends_with(Key, '.dump')].[Key, Size, LastModified]" --output text 2>/dev/null || echo "")"
+# Fetch all keys under client prefix in a single call for high efficiency
+ALL_OBJECTS_JSON="$(aws s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${CLIENT_PREFIX}" --endpoint-url "${R2_ENDPOINT}" --output json 2>/dev/null || echo "{}")"
 
-if [[ -z "${OBJECTS}" || "${OBJECTS}" == "None" ]]; then
-    echo "  (No remote backups found for prefix: ${BACKUP_CLIENT_ID}/postgres/)"
+DUMP_KEYS="$(echo "${ALL_OBJECTS_JSON}" | grep -E '"Key":' | grep -E '\.dump"' | awk -F'"' '{print $4}' || true)"
+
+if [[ -z "${DUMP_KEYS}" ]]; then
+    echo "  (No remote backups found under client prefix: ${CLIENT_PREFIX})"
 else
-    echo "${OBJECTS}" | while IFS=$'\t' read -r key size last_mod; do
-        if [[ -n "${key}" ]]; then
-            SIZE_HUMAN="$(numfmt --to=iec-i --suffix=B "${size}" 2>/dev/null || echo "${size} bytes")"
-            printf "%-56s | %-10s | %-20s\n" "${key}" "${SIZE_HUMAN}" "${last_mod}"
+    echo "${DUMP_KEYS}" | while read -r DUMP_KEY; do
+        if [[ -n "${DUMP_KEY}" ]]; then
+            # Check size and date
+            SIZE_BYTES="$(echo "${ALL_OBJECTS_JSON}" | grep -B 2 -A 4 "\"Key\": \"${DUMP_KEY}\"" | grep -E '"Size":' | tr -dc '0-9' || echo "0")"
+            MOD_DATE="$(echo "${ALL_OBJECTS_JSON}" | grep -B 2 -A 4 "\"Key\": \"${DUMP_KEY}\"" | grep -E '"LastModified":' | awk -F'"' '{print $4}' | cut -d'.' -f1 || echo "N/A")"
+            
+            # Check for matching .sha256 and .complete
+            HAS_SHA="$(echo "${ALL_OBJECTS_JSON}" | grep -q "\"Key\": \"${DUMP_KEY}.sha256\"" && echo "yes" || echo "no")"
+            HAS_MARKER="$(echo "${ALL_OBJECTS_JSON}" | grep -q "\"Key\": \"${DUMP_KEY}.complete\"" && echo "yes" || echo "no")"
+            
+            if [[ "${HAS_SHA}" == "yes" && "${HAS_MARKER}" == "yes" ]]; then
+                STATUS="COMPLETE"
+            elif [[ "${HAS_SHA}" != "yes" ]]; then
+                STATUS="INCOMPLETE (No SHA)"
+            elif [[ "${HAS_MARKER}" != "yes" ]]; then
+                STATUS="INCOMPLETE (No Marker)"
+            else
+                STATUS="INCOMPLETE"
+            fi
+            
+            SIZE_HUMAN="$(numfmt --to=iec-i --suffix=B "${SIZE_BYTES}" 2>/dev/null || echo "${SIZE_BYTES} B")"
+            printf "%-62s | %-10s | %-20s | %-16s\n" "${DUMP_KEY}" "${SIZE_HUMAN}" "${MOD_DATE}" "${STATUS}"
         fi
     done
 fi
-echo "=========================================================================================================="
+echo "================================================================================================================================="

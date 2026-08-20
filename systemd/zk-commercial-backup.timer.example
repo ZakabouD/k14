@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily Commercial Attendance Backup Timer (03:00 Africa/Casablanca)
+
+[Timer]
+# Runs daily at 03:00 local company time (Africa/Casablanca)
+# Systemd v240+ natively supports timezone identifiers in OnCalendar:
+OnCalendar=*-*-* 03:00:00 Africa/Casablanca
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
