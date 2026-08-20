@@ -25,6 +25,7 @@
     "backup:remote:download": "./scripts/download-backup-r2.sh",
     "backup:full": "./scripts/backup-full.sh",
     "backup:schedule": "./scripts/install-backup-schedule.sh",
+    "preflight": "./scripts/production-preflight.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
