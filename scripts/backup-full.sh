@@ -40,7 +40,7 @@ fi
 # Pipeline cleanup and failure notification handler
 on_pipeline_exit() {
     local exit_code=$?
-    if [[ ! command -v flock >/dev/null 2>&1 ]]; then
+    if ! command -v flock >/dev/null 2>&1; then
         rm -rf "${LOCK_DIR}" 2>/dev/null || true
     fi
     if [[ ${exit_code} -ne 0 ]]; then

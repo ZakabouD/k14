@@ -182,11 +182,14 @@ npm run backup:remote:download -- attendance_2026-08-19_212910Z.dump
 # 2. Restore into isolated test DB and retain for query validation
 ./scripts/restore-postgres.sh backups/postgres/attendance_2026-08-19_212910Z.dump attendance_dr_test --keep
 
-# 3. Query and inspect restored tables in attendance_dr_test
-docker exec zk_postgres psql -U attendance_admin -d attendance_dr_test -c "SELECT count(*) FROM \"User\";"
+# 3. Extract configured database user dynamically from .env.docker
+POSTGRES_USER="$(grep -E '^POSTGRES_USER=' .env.docker | cut -d '=' -f2- | tr -d '\r\n"')"
 
-# 4. Clean up temporary DR test database after inspection:
-docker exec zk_postgres psql -U attendance_admin -d postgres -c "DROP DATABASE IF EXISTS \"attendance_dr_test\";"
+# 4. Query and inspect restored tables in attendance_dr_test
+docker exec zk_postgres psql -U "${POSTGRES_USER}" -d attendance_dr_test -c "SELECT count(*) FROM \"User\";"
+
+# 5. Clean up temporary DR test database after inspection (Never drop POSTGRES_DB!):
+docker exec zk_postgres psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE IF EXISTS \"attendance_dr_test\";"
 ```
 
 ### Production Full Database Ingestion (Controlled Bare-Metal Recovery)
@@ -214,8 +217,9 @@ To clean up old local test dumps or temporary verification databases safely:
 
 ### 1. Drop Temporary DR Databases
 ```bash
-# Only drop databases explicitly named as test databases (never POSTGRES_DB)
-docker exec zk_postgres psql -U attendance_admin -d postgres -c "DROP DATABASE IF EXISTS \"attendance_dr_test\";"
+POSTGRES_USER="$(grep -E '^POSTGRES_USER=' .env.docker | cut -d '=' -f2- | tr -d '\r\n"')"
+# Only drop databases explicitly named as test databases (NEVER POSTGRES_DB)
+docker exec zk_postgres psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE IF EXISTS \"attendance_dr_test\";"
 ```
 
 ### 2. Clean Local Test Backup Files
