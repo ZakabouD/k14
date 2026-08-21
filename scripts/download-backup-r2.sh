@@ -91,7 +91,7 @@ else
     export AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}"
     export AWS_DEFAULT_REGION="auto"
     
-    FOUND_KEY="$(aws s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${EXPECTED_PREFIX}" --endpoint-url "${R2_ENDPOINT}" --query "Contents[?ends_with(Key, '${REMOTE_KEY}')].Key | [0]" --output text 2>/dev/null || echo "")"
+    FOUND_KEY="$(aws s3 ls "s3://${R2_BUCKET}/${EXPECTED_PREFIX}" --endpoint-url "${R2_ENDPOINT}" --recursive 2>/dev/null | grep -E "[[:space:]]${EXPECTED_PREFIX}.*${REMOTE_KEY}$" | awk '{$1=$2=$3=""; print substr($0,4)}' | head -n 1 || echo "")"
     if [[ -n "${FOUND_KEY}" && "${FOUND_KEY}" != "None" ]]; then
         REMOTE_KEY="${FOUND_KEY}"
     else
@@ -169,7 +169,13 @@ if [[ "${MARKER_FILENAME}" != "${DUMP_BASENAME}" ]]; then
     exit 1
 fi
 
-LOCAL_DOWNLOAD_SIZE="$(stat -f "%z" "${LOCAL_DUMP_PATH}" 2>/dev/null || stat -c "%s" "${LOCAL_DUMP_PATH}" 2>/dev/null || echo "0")"
+if stat -c "%s" "${LOCAL_DUMP_PATH}" >/dev/null 2>&1; then
+    LOCAL_DOWNLOAD_SIZE="$(stat -c "%s" "${LOCAL_DUMP_PATH}")"
+elif stat -f "%z" "${LOCAL_DUMP_PATH}" >/dev/null 2>&1; then
+    LOCAL_DOWNLOAD_SIZE="$(stat -f "%z" "${LOCAL_DUMP_PATH}")"
+else
+    LOCAL_DOWNLOAD_SIZE="$(wc -c < "${LOCAL_DUMP_PATH}" | tr -d ' ')"
+fi
 if [[ -n "${MARKER_SIZE}" && "${MARKER_SIZE}" -ne "${LOCAL_DOWNLOAD_SIZE}" ]]; then
     echo "[-] MARKER VALIDATION ERROR: Downloaded file size (${LOCAL_DOWNLOAD_SIZE} bytes) does not match marker size (${MARKER_SIZE} bytes)." >&2
     rm -f "${LOCAL_DUMP_PATH}" "${LOCAL_SHA_PATH}" "${LOCAL_MARKER_PATH}"

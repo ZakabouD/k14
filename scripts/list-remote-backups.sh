@@ -62,24 +62,23 @@ echo "==========================================================================
 printf "%-62s | %-10s | %-20s | %-16s\n" "Remote Key" "Size" "Last Modified" "Status"
 echo "---------------------------------------------------------------------------------------------------------------------------------"
 
-# Fetch all keys under client prefix in a single call for high efficiency
-ALL_OBJECTS_JSON="$(aws s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${CLIENT_PREFIX}" --endpoint-url "${R2_ENDPOINT}" --output json 2>/dev/null || echo "{}")"
+# Fetch all objects under client prefix using aws s3 ls
+S3_OUTPUT="$(aws s3 ls "s3://${R2_BUCKET}/${CLIENT_PREFIX}" --endpoint-url "${R2_ENDPOINT}" --recursive 2>/dev/null || echo "")"
 
-DUMP_KEYS="$(echo "${ALL_OBJECTS_JSON}" | grep -E '"Key":' | grep -E '\.dump"' | awk -F'"' '{print $4}' || true)"
+DUMP_LINES="$(echo "${S3_OUTPUT}" | grep -E '\.dump$' || true)"
 
-if [[ -z "${DUMP_KEYS}" ]]; then
+if [[ -z "${DUMP_LINES}" ]]; then
     echo "  (No remote backups found under client prefix: ${CLIENT_PREFIX})"
 else
-    echo "${DUMP_KEYS}" | while read -r DUMP_KEY; do
-        if [[ -n "${DUMP_KEY}" ]]; then
-            # Check size and date
-            SIZE_BYTES="$(echo "${ALL_OBJECTS_JSON}" | grep -B 2 -A 4 "\"Key\": \"${DUMP_KEY}\"" | grep -E '"Size":' | tr -dc '0-9' || echo "0")"
-            MOD_DATE="$(echo "${ALL_OBJECTS_JSON}" | grep -B 2 -A 4 "\"Key\": \"${DUMP_KEY}\"" | grep -E '"LastModified":' | awk -F'"' '{print $4}' | cut -d'.' -f1 || echo "N/A")"
-            
-            # Check for matching .sha256 and .complete
-            HAS_SHA="$(echo "${ALL_OBJECTS_JSON}" | grep -q "\"Key\": \"${DUMP_KEY}.sha256\"" && echo "yes" || echo "no")"
-            HAS_MARKER="$(echo "${ALL_OBJECTS_JSON}" | grep -q "\"Key\": \"${DUMP_KEY}.complete\"" && echo "yes" || echo "no")"
-            
+    echo "${DUMP_LINES}" | while read -r line; do
+        if [[ -n "${line}" ]]; then
+            MOD_DATE="$(echo "${line}" | awk '{print $1" "$2}')"
+            SIZE_BYTES="$(echo "${line}" | awk '{print $3}')"
+            DUMP_KEY="$(echo "${line}" | awk '{$1=$2=$3=""; print substr($0,4)}')"
+
+            HAS_SHA="$(echo "${S3_OUTPUT}" | grep -q "${DUMP_KEY}.sha256" && echo "yes" || echo "no")"
+            HAS_MARKER="$(echo "${S3_OUTPUT}" | grep -q "${DUMP_KEY}.complete" && echo "yes" || echo "no")"
+
             if [[ "${HAS_SHA}" == "yes" && "${HAS_MARKER}" == "yes" ]]; then
                 STATUS="COMPLETE"
             elif [[ "${HAS_SHA}" != "yes" ]]; then
@@ -89,7 +88,7 @@ else
             else
                 STATUS="INCOMPLETE"
             fi
-            
+
             SIZE_HUMAN="$(numfmt --to=iec-i --suffix=B "${SIZE_BYTES}" 2>/dev/null || echo "${SIZE_BYTES} B")"
             printf "%-62s | %-10s | %-20s | %-16s\n" "${DUMP_KEY}" "${SIZE_HUMAN}" "${MOD_DATE}" "${STATUS}"
         fi

@@ -150,7 +150,13 @@ REMOTE_DUMP_KEY="${REMOTE_PREFIX}/${DUMP_BASENAME}"
 REMOTE_SHA_KEY="${REMOTE_PREFIX}/${DUMP_BASENAME}.sha256"
 REMOTE_MARKER_KEY="${REMOTE_PREFIX}/${DUMP_BASENAME}.complete"
 
-LOCAL_SIZE_BYTES="$(stat -f "%z" "${LOCAL_DUMP_PATH}" 2>/dev/null || stat -c "%s" "${LOCAL_DUMP_PATH}" 2>/dev/null || echo "0")"
+if stat -c "%s" "${LOCAL_DUMP_PATH}" >/dev/null 2>&1; then
+    LOCAL_SIZE_BYTES="$(stat -c "%s" "${LOCAL_DUMP_PATH}")"
+elif stat -f "%z" "${LOCAL_DUMP_PATH}" >/dev/null 2>&1; then
+    LOCAL_SIZE_BYTES="$(stat -f "%z" "${LOCAL_DUMP_PATH}")"
+else
+    LOCAL_SIZE_BYTES="$(wc -c < "${LOCAL_DUMP_PATH}" | tr -d ' ')"
+fi
 SHA256_HASH="${ACTUAL_LOCAL_HASH}"
 TIMESTAMP_UTC="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
@@ -236,11 +242,12 @@ if [[ "${BACKUP_REMOTE_RETENTION_DAYS}" -gt 0 ]]; then
     CUTOFF_DATE="$(date -u -v-"${BACKUP_REMOTE_RETENTION_DAYS}"d +"%Y-%m-%d" 2>/dev/null || date -u -d "${BACKUP_REMOTE_RETENTION_DAYS} days ago" +"%Y-%m-%d" 2>/dev/null || echo "")"
     
     if [[ -n "${CUTOFF_DATE}" ]]; then
-        # List remote objects strictly within client prefix
-        aws s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${BACKUP_CLIENT_ID}/postgres/" --endpoint-url "${R2_ENDPOINT}" --query "Contents[?LastModified<='${CUTOFF_DATE}'].Key" --output text | tr '\t' '\n' | while read -r OLD_KEY; do
-            if [[ -n "${OLD_KEY}" && "${OLD_KEY}" != "None" ]]; then
-                echo "    Pruning expired remote backup: ${OLD_KEY}"
-                aws s3 rm "s3://${R2_BUCKET}/${OLD_KEY}" --endpoint-url "${R2_ENDPOINT}" >/dev/null 2>&1 || true
+        aws s3 ls "s3://${R2_BUCKET}/${BACKUP_CLIENT_ID}/postgres/" --endpoint-url "${R2_ENDPOINT}" --recursive 2>/dev/null | while read -r line; do
+            OBJ_DATE="$(echo "${line}" | awk '{print $1}')"
+            OBJ_KEY="$(echo "${line}" | awk '{$1=$2=$3=""; print substr($0,4)}')"
+            if [[ -n "${OBJ_KEY}" && "${OBJ_DATE}" < "${CUTOFF_DATE}" ]]; then
+                echo "    Pruning expired remote backup: ${OBJ_KEY}"
+                aws s3 rm "s3://${R2_BUCKET}/${OBJ_KEY}" --endpoint-url "${R2_ENDPOINT}" >/dev/null 2>&1 || true
             fi
         done
     fi
