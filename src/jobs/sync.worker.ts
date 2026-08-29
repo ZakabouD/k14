@@ -1,6 +1,7 @@
 import { CronJob } from 'cron';
 import { deviceApiClient } from '../services/api-client';
 import { ZKTecoRecord, ZKTecoUser } from '../types/zkteco.types';
+import { assertRuntimeTimezone } from '../config/timezone';
 // @ts-ignore
 import Zkteco from 'zkteco-js';
 import net from 'net';
@@ -102,6 +103,9 @@ export class SyncWorker {
   }
 
   start() {
+    // 0. Enforce strict runtime timezone validation before starting timers or connecting
+    assertRuntimeTimezone();
+
     console.log('[SyncWorker] Starting sync cron job on Raspberry Pi bridge...');
     this.job.start();
     
@@ -164,6 +168,9 @@ export class SyncWorker {
       console.warn('[SyncWorker] A sync iteration is already in progress. Skipping to prevent overlapping execution.');
       return;
     }
+
+    // Enforce timezone assertion guard before initiating hardware communication
+    assertRuntimeTimezone();
 
     this.isRunning = true;
     console.log(`[SyncWorker] Executing ${isManual ? 'manual ' : ''}sync at ${new Date().toISOString()}`);

@@ -289,20 +289,28 @@ curl -i https://pointage.client-domain.ma/api/health
 ---
 
 ### STAGE 13: Provision Hardware Bridge (Raspberry Pi)
-1. In the Dashboard UI $\rightarrow$ **Paramètres / Appareils** (or via `npm run device:create`):
-   - Register a new device: `DEV-CASABLANCA-01`
-   - Generate secure device token.
-2. On the on-premise Raspberry Pi:
-   - Configure `/opt/attendance-bridge/.env`:
-     ```env
-     VPS_API_URL=https://pointage.client-domain.ma
-     DEVICE_ID=DEV-CASABLANCA-01
-     DEVICE_TOKEN=<generated_device_token>
-     ZK_DEVICE_IP=192.168.1.201
-     ZK_DEVICE_PORT=4370
-     ```
-   - Start the bridge worker.
-3. Verify that the Dashboard reflects real-time heartbeat and punch synchronization.
+1. Generate secure device credentials using the canonical containerized provisioning command on the VPS:
+   ```bash
+   npm run docker:device:create -- --id DEV-CASABLANCA-01 --name "Pointeuse Principale Casablanca"
+   ```
+   *Note: This command runs `src/scripts/device-create.ts` inside the `migrate` container with direct access to PostgreSQL network, generates a 32-byte cryptographically secure token, stores only the SHA-256 hash in the database, and prints the raw token once.*
+
+2. Transfer the generated raw token securely to the on-premise Raspberry Pi.
+
+3. On the Raspberry Pi, configure `/opt/attendance-bridge/.env` (mode `600`) using the authoritative variable names:
+   ```env
+   API_BASE_URL="https://pointage.client-domain.ma"
+   DEVICE_ID="DEV-CASABLANCA-01"
+   DEVICE_TOKEN="<generated_device_token>"
+   ZKTECO_IP="192.168.1.201"
+   ZKTECO_PORT=4370
+   SYNC_INTERVAL_CRON="*/15 * * * *"
+   ```
+
+4. Complete the full Raspberry Pi installation and PM2 service setup by following the dedicated runbook:
+   $\rightarrow$ **[docs/RASPBERRY_PI_DEPLOYMENT.md](file:///Users/zakariabouchtart/zk-k14-commercial/docs/RASPBERRY_PI_DEPLOYMENT.md)**
+
+5. Verify that the Dashboard reflects real-time heartbeat (`deviceOnline: true`) and punch synchronization.
 
 ---
 

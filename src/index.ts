@@ -1,6 +1,10 @@
 import { syncWorker } from './jobs/sync.worker';
+import { assertRuntimeTimezone } from './config/timezone';
 
 async function main() {
+  // Pre-flight validation: ensure Node.js is running in required deployment timezone
+  assertRuntimeTimezone();
+
   console.log('Starting ZKTeco Raspberry Pi Sync Bridge...');
   console.log(`Device ID: ${process.env.DEVICE_ID || 'FACTORY-01'}`);
   console.log(`API URL:   ${process.env.API_BASE_URL || 'http://localhost:3000'}`);
