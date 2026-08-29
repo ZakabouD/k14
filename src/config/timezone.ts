@@ -5,7 +5,12 @@
  * using Node.js process local timezone. A mismatched timezone causes silent timestamp shifts.
  * This module enforces strict IANA timezone validation at application startup before any
  * hardware communication or API ingestion takes place.
+ *
+ * The commercial K14 hardware attendance solution is deployed for the Moroccan market,
+ * requiring strict adherence to the official IANA 'Africa/Casablanca' timezone identifier.
  */
+
+export const REQUIRED_WORKER_TIMEZONE = "Africa/Casablanca";
 
 export interface TimezoneValidationResult {
   valid: boolean;
@@ -18,7 +23,7 @@ export interface TimezoneValidationResult {
  * Validates the current Node.js runtime timezone against the expected IANA timezone identifier.
  */
 export function validateRuntimeTimezone(
-  expectedTimezone: string = process.env.APP_TIMEZONE || process.env.TIMEZONE || "Africa/Casablanca"
+  expectedTimezone: string = REQUIRED_WORKER_TIMEZONE
 ): TimezoneValidationResult {
   const actualTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const expected = expectedTimezone.trim();
@@ -45,7 +50,7 @@ export function validateRuntimeTimezone(
  * Throws a fatal error and terminates execution if validation fails.
  */
 export function assertRuntimeTimezone(
-  expectedTimezone: string = process.env.APP_TIMEZONE || process.env.TIMEZONE || "Africa/Casablanca"
+  expectedTimezone: string = REQUIRED_WORKER_TIMEZONE
 ): void {
   const result = validateRuntimeTimezone(expectedTimezone);
 

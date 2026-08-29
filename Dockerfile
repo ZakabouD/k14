@@ -19,10 +19,11 @@ COPY package.json package-lock.json* prisma.config.ts* ./
 COPY dashboard/package.json dashboard/package-lock.json* dashboard/prisma.config.ts* ./dashboard/
 COPY prisma/schema.prisma ./prisma/
 
-# Install root dependencies
+# Install root dependencies and generate root Prisma client
 RUN npm ci || npm install --no-audit
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
-# Install dashboard dependencies and generate Prisma client
+# Install dashboard dependencies and generate dashboard Prisma client
 WORKDIR /app/dashboard
 RUN npm ci || npm install --no-audit
 RUN npx prisma generate --schema=../prisma/schema.prisma

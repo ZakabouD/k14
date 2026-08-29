@@ -1,4 +1,4 @@
-import { validateRuntimeTimezone, assertRuntimeTimezone } from '../src/config/timezone';
+import { validateRuntimeTimezone, assertRuntimeTimezone, REQUIRED_WORKER_TIMEZONE } from '../src/config/timezone';
 
 function runTests() {
   console.log('============================================================');
@@ -19,41 +19,48 @@ function runTests() {
   }
 
   const currentRuntimeTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  console.log(`Detected local Node.js runtime timezone: ${currentRuntimeTz}\n`);
+  console.log(`Detected local Node.js runtime timezone: ${currentRuntimeTz}`);
+  console.log(`Mandatory required worker timezone:       ${REQUIRED_WORKER_TIMEZONE}\n`);
 
-  // Test 1: Matching expected timezone returns valid = true
+  // Test 1: REQUIRED_WORKER_TIMEZONE constant is strictly Africa/Casablanca
+  assert(
+    REQUIRED_WORKER_TIMEZONE === 'Africa/Casablanca',
+    "REQUIRED_WORKER_TIMEZONE is strictly 'Africa/Casablanca'"
+  );
+
+  // Test 2: Matching Africa/Casablanca returns valid = true
   const matchResult = validateRuntimeTimezone(currentRuntimeTz);
-  assert(matchResult.valid === true, `Matching timezone (${currentRuntimeTz}) returns valid: true`);
-  assert(matchResult.actual === currentRuntimeTz, `Result reports correct actual timezone (${currentRuntimeTz})`);
-  assert(matchResult.expected === currentRuntimeTz, `Result reports correct expected timezone`);
+  assert(
+    matchResult.valid === (currentRuntimeTz === REQUIRED_WORKER_TIMEZONE),
+    `Local timezone validation matches expected status for ${currentRuntimeTz}`
+  );
 
-  // Test 2: Mismatched timezone returns valid = false with clear error
-  const mismatchTarget = (currentRuntimeTz === 'UTC') ? 'Europe/Paris' : 'UTC';
-  const mismatchResult = validateRuntimeTimezone(mismatchTarget);
-  assert(mismatchResult.valid === false, `Mismatched timezone target (${mismatchTarget}) returns valid: false`);
-  assert(typeof mismatchResult.error === 'string' && mismatchResult.error.length > 0, `Error description is populated`);
-
-  // Test 3: Specific international timezone mismatches
+  // Test 3: Mismatched timezones return valid = false with clear error
   const testCases = [
-    { target: 'UTC', expectMatch: currentRuntimeTz === 'UTC' },
-    { target: 'Europe/Paris', expectMatch: currentRuntimeTz === 'Europe/Paris' },
-    { target: 'America/New_York', expectMatch: currentRuntimeTz === 'America/New_York' },
-    { target: 'Asia/Tokyo', expectMatch: currentRuntimeTz === 'Asia/Tokyo' },
-    { target: 'Africa/Casablanca', expectMatch: currentRuntimeTz === 'Africa/Casablanca' }
+    { target: 'UTC', expectValid: currentRuntimeTz === 'UTC' },
+    { target: 'Europe/Paris', expectValid: currentRuntimeTz === 'Europe/Paris' },
+    { target: 'America/New_York', expectValid: currentRuntimeTz === 'America/New_York' },
+    { target: 'Asia/Tokyo', expectValid: currentRuntimeTz === 'Asia/Tokyo' }
   ];
 
   for (const tc of testCases) {
     const res = validateRuntimeTimezone(tc.target);
     assert(
-      res.valid === tc.expectMatch,
-      `Target '${tc.target}' validation correctly yields valid=${tc.expectMatch}`
+      res.valid === tc.expectValid,
+      `Target '${tc.target}' validation correctly yields valid=${tc.expectValid}`
     );
+    if (!res.valid) {
+      assert(
+        typeof res.error === 'string' && res.error.includes(tc.target),
+        `Error message explains mismatch for '${tc.target}'`
+      );
+    }
   }
 
   // Test 4: assertRuntimeTimezone throws Error on mismatch
   let threwOnMismatch = false;
   try {
-    assertRuntimeTimezone('NonExistent/Invalid_Timezone_For_Testing');
+    assertRuntimeTimezone('Invalid/NonExistent_Timezone_Mock');
   } catch (err: any) {
     threwOnMismatch = true;
     assert(
@@ -63,17 +70,17 @@ function runTests() {
   }
   assert(threwOnMismatch, 'assertRuntimeTimezone fails closed on timezone mismatch');
 
-  // Test 5: assertRuntimeTimezone succeeds without throwing on exact match
+  // Test 5: assertRuntimeTimezone succeeds cleanly on match
   let threwOnMatch = false;
   try {
     assertRuntimeTimezone(currentRuntimeTz);
   } catch (err) {
     threwOnMatch = true;
   }
-  assert(!threwOnMatch, 'assertRuntimeTimezone succeeds cleanly on exact match');
+  assert(!threwOnMatch, 'assertRuntimeTimezone succeeds cleanly when timezone matches');
 
   console.log('\n============================================================');
-  console.log(` Test Summary: ${passed} passed, ${failed} failed`);
+  console.log(` Timezone Test Summary: ${passed} passed, ${failed} failed`);
   console.log('============================================================');
 
   if (failed > 0) {

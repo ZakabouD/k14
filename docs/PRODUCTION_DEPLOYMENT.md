@@ -295,6 +295,12 @@ curl -i https://pointage.client-domain.ma/api/health
    ```
    *Note: This command runs `src/scripts/device-create.ts` inside the `migrate` container with direct access to PostgreSQL network, generates a 32-byte cryptographically secure token, stores only the SHA-256 hash in the database, and prints the raw token once.*
 
+   > [!WARNING]
+   > **DEVICE TOKEN ROTATION BEHAVIOR:**
+   > Running `npm run docker:device:create` on an already existing `DEVICE_ID` generates a **new** token hash and immediately rotates credentials in the database.
+   > This **invalidates** the old token on any running Raspberry Pi bridge.
+   > Only re-run device provisioning when intentionally rotating or recovering lost device credentials, and remember to update `.env` on the Pi immediately.
+
 2. Transfer the generated raw token securely to the on-premise Raspberry Pi.
 
 3. On the Raspberry Pi, configure `/opt/attendance-bridge/.env` (mode `600`) using the authoritative variable names:
@@ -308,7 +314,7 @@ curl -i https://pointage.client-domain.ma/api/health
    ```
 
 4. Complete the full Raspberry Pi installation and PM2 service setup by following the dedicated runbook:
-   $\rightarrow$ **[docs/RASPBERRY_PI_DEPLOYMENT.md](file:///Users/zakariabouchtart/zk-k14-commercial/docs/RASPBERRY_PI_DEPLOYMENT.md)**
+   $\rightarrow$ **[RASPBERRY_PI_DEPLOYMENT.md](./RASPBERRY_PI_DEPLOYMENT.md)**
 
 5. Verify that the Dashboard reflects real-time heartbeat (`deviceOnline: true`) and punch synchronization.
 
@@ -359,7 +365,7 @@ docker exec zk_postgres psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE
 ---
 
 ### STAGE 17: Production Acceptance Sign-Off
-Complete all checklist items in [PRODUCTION_ACCEPTANCE_CHECKLIST.md](file:///Users/zakariabouchtart/zk-k14-commercial/docs/PRODUCTION_ACCEPTANCE_CHECKLIST.md).
+Complete all checklist items in [PRODUCTION_ACCEPTANCE_CHECKLIST.md](./PRODUCTION_ACCEPTANCE_CHECKLIST.md).
 
 ---
 

@@ -187,6 +187,12 @@ sudo npm install -g pm2
 > - Never commit `.env` to Git (it is ignored by `.gitignore`).
 > - Keep `.env` permissions strictly restricted (`chmod 600 .env`).
 
+> [!WARNING]
+> **DEVICE TOKEN ROTATION BEHAVIOR:**
+> Re-running `npm run docker:device:create` on the central VPS for an already existing `DEVICE_ID` generates a **new** token hash and immediately rotates credentials in the database.
+> The old token on the Raspberry Pi will instantly receive HTTP 401 Unauthorized.
+> When rotating credentials, copy the new token into `.env` on the Pi and run `pm2 restart zkteco-sync-worker`.
+
 ---
 
 ### STAGE 7: Pre-Flight Non-Destructive Connectivity Tests
@@ -269,11 +275,13 @@ pm2 stop zkteco-sync-worker
 | Symptom | Probable Cause | Corrective Action |
 | :--- | :--- | :--- |
 | `FATAL TIMEZONE CONFIGURATION ERROR` | Pi OS timezone is not `Africa/Casablanca` | Run `sudo timedatectl set-timezone Africa/Casablanca` and restart PM2. |
+| `FATAL CONFIGURATION ERROR — INCOMPLETE ENVIRONMENT` | Missing `.env` file or unpopulated required variables (`API_BASE_URL`, `DEVICE_ID`, `DEVICE_TOKEN`, `ZKTECO_IP`) | Create `.env` from `.env.worker.example`, fill in all required values, verify `chmod 600 .env`, and run `pm2 restart zkteco-sync-worker`. |
 | `Failed to connect to biometric device at ...:4370` | K14 IP changed, cable unplugged, or terminal powered off | Check physical ethernet connection, verify K14 IP screen menu, test with `ping <ZKTECO_IP>`. |
 | `Sync batch rejected with non-retryable status 401` | Invalid or rotated `DEVICE_TOKEN` | Re-provision token on VPS via `npm run docker:device:create` and update `.env`. |
 | `Sync batch rejected with non-retryable status 403` | Device marked `isActive: false` on server | Reactivate device in central dashboard or database. |
 | `Transient HTTP 502 / 503 / 504` | Central VPS temporarily undergoing restart | No action required; worker will retry with exponential backoff and resume automatically. |
 | `System clock synchronized: no` | Local network blocking UDP 123 (NTP) | Allow NTP port 123 in router firewall; check `sudo systemctl restart systemd-timesyncd`. |
+| `Worker exits / restarts immediately on startup` | Startup assertion failed (Timezone or Config) | Inspect `pm2 logs zkteco-sync-worker --lines 50` for exact pre-flight error banner. |
 
 ---
 

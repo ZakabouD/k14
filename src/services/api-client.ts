@@ -15,20 +15,39 @@ export interface CommandsResponse {
 }
 
 export class DeviceApiClient {
-  private baseUrl: string;
-  private deviceId: string;
-  private deviceToken: string;
-  private chunkSize: number;
-  private maxRetries: number;
-  private baseRetryDelayMs: number;
+  private getConfig() {
+    return {
+      baseUrl: (process.env.API_BASE_URL || "http://localhost:3000").replace(/\/+$/, ""),
+      deviceId: process.env.DEVICE_ID || "FACTORY-01",
+      deviceToken: process.env.DEVICE_TOKEN || "",
+      chunkSize: parseInt(process.env.SYNC_CHUNK_SIZE || "500", 10) || 500,
+      maxRetries: parseInt(process.env.SYNC_MAX_RETRIES || "3", 10) || 3,
+      baseRetryDelayMs: parseInt(process.env.SYNC_RETRY_DELAY_MS || "1000", 10) || 1000
+    };
+  }
 
-  constructor() {
-    this.baseUrl = (process.env.API_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
-    this.deviceId = process.env.DEVICE_ID || "FACTORY-01";
-    this.deviceToken = process.env.DEVICE_TOKEN || "";
-    this.chunkSize = parseInt(process.env.SYNC_CHUNK_SIZE || "500", 10) || 500;
-    this.maxRetries = parseInt(process.env.SYNC_MAX_RETRIES || "3", 10) || 3;
-    this.baseRetryDelayMs = parseInt(process.env.SYNC_RETRY_DELAY_MS || "1000", 10) || 1000;
+  private get baseUrl(): string {
+    return this.getConfig().baseUrl;
+  }
+
+  private get deviceId(): string {
+    return this.getConfig().deviceId;
+  }
+
+  private get deviceToken(): string {
+    return this.getConfig().deviceToken;
+  }
+
+  private get chunkSize(): number {
+    return this.getConfig().chunkSize;
+  }
+
+  private get maxRetries(): number {
+    return this.getConfig().maxRetries;
+  }
+
+  private get baseRetryDelayMs(): number {
+    return this.getConfig().baseRetryDelayMs;
   }
 
   private getHeaders(): Record<string, string> {

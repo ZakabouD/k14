@@ -1,13 +1,24 @@
-import { syncWorker } from './jobs/sync.worker';
+import 'dotenv/config';
 import { assertRuntimeTimezone } from './config/timezone';
+import { assertWorkerConfig } from './config/worker-config';
+import { syncWorker } from './jobs/sync.worker';
 
 async function main() {
-  // Pre-flight validation: ensure Node.js is running in required deployment timezone
+  console.log('============================================================');
+  console.log(' Starting ZKTeco Raspberry Pi Sync Bridge...');
+  console.log('============================================================');
+
+  // Pre-flight validation 1: Enforce strict Morocco IANA timezone
   assertRuntimeTimezone();
 
-  console.log('Starting ZKTeco Raspberry Pi Sync Bridge...');
-  console.log(`Device ID: ${process.env.DEVICE_ID || 'FACTORY-01'}`);
-  console.log(`API URL:   ${process.env.API_BASE_URL || 'http://localhost:3000'}`);
+  // Pre-flight validation 2: Enforce complete worker environment configuration
+  const config = assertWorkerConfig();
+
+  console.log(` Device ID:    ${config.deviceId}`);
+  console.log(` API Endpoint: ${config.apiBaseUrl}`);
+  console.log(` Terminal IP:  ${config.zktecoIp}:${config.zktecoPort}`);
+  console.log(` Sync Cron:    ${config.syncIntervalCron}`);
+  console.log('============================================================\n');
 
   // Start the background synchronization worker
   syncWorker.start();
@@ -24,6 +35,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('Fatal error starting sync bridge:', e);
+  console.error('Fatal error starting sync bridge:', e.message || e);
   process.exit(1);
 });

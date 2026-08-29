@@ -27,8 +27,9 @@
     "backup:full": "./scripts/backup-full.sh",
     "backup:schedule": "./scripts/install-backup-schedule.sh",
     "preflight": "./scripts/production-preflight.sh",
-    "test": "ts-node tests/timezone.test.ts",
-    "test:timezone": "ts-node tests/timezone.test.ts"
+    "test": "ts-node tests/timezone.test.ts && ts-node tests/worker-config.test.ts",
+    "test:timezone": "ts-node tests/timezone.test.ts",
+    "test:config": "ts-node tests/worker-config.test.ts"
   },
   "keywords": [],
   "author": "",

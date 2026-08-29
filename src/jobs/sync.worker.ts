@@ -2,6 +2,7 @@ import { CronJob } from 'cron';
 import { deviceApiClient } from '../services/api-client';
 import { ZKTecoRecord, ZKTecoUser } from '../types/zkteco.types';
 import { assertRuntimeTimezone } from '../config/timezone';
+import { getWorkerConfig, assertWorkerConfig } from '../config/worker-config';
 // @ts-ignore
 import Zkteco from 'zkteco-js';
 import net from 'net';
@@ -35,11 +36,8 @@ function checkDeviceReachable(ip: string, port: number, timeoutMs = 2000): Promi
 }
 
 const getDeviceConfig = () => {
-  const ip = process.env.ZKTECO_IP || "192.168.1.201";
-  const port = process.env.ZKTECO_PORT ? parseInt(process.env.ZKTECO_PORT, 10) : 4370;
-  const timeout = process.env.ZKTECO_TIMEOUT ? parseInt(process.env.ZKTECO_TIMEOUT, 10) : 10000;
-
-  return { ip, port, timeout };
+  const config = getWorkerConfig();
+  return { ip: config.zktecoIp, port: config.zktecoPort, timeout: config.zktecoTimeout };
 };
 
 const MAX_CONNECTION_RETRIES = 3;
@@ -103,10 +101,12 @@ export class SyncWorker {
   }
 
   start() {
-    // 0. Enforce strict runtime timezone validation before starting timers or connecting
+    // 0. Enforce strict runtime timezone and environment configuration validation
     assertRuntimeTimezone();
+    const config = assertWorkerConfig();
 
     console.log('[SyncWorker] Starting sync cron job on Raspberry Pi bridge...');
+    this.job = new CronJob(config.syncIntervalCron, () => this.execute(false));
     this.job.start();
     
     // Start polling API for manual sync requests & sending heartbeat every 5 seconds
@@ -118,7 +118,9 @@ export class SyncWorker {
 
   stop() {
     console.log('[SyncWorker] Stopping sync worker...');
-    this.job.stop();
+    if (this.job) {
+      this.job.stop();
+    }
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
       this.pollInterval = null;
@@ -169,8 +171,9 @@ export class SyncWorker {
       return;
     }
 
-    // Enforce timezone assertion guard before initiating hardware communication
+    // Enforce pre-flight assertion guards before initiating hardware communication
     assertRuntimeTimezone();
+    assertWorkerConfig();
 
     this.isRunning = true;
     console.log(`[SyncWorker] Executing ${isManual ? 'manual ' : ''}sync at ${new Date().toISOString()}`);
