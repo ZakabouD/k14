@@ -316,7 +316,10 @@ curl -i https://pointage.client-domain.ma/api/health
 4. Complete the full Raspberry Pi installation and PM2 service setup by following the dedicated runbook:
    $\rightarrow$ **[RASPBERRY_PI_DEPLOYMENT.md](./RASPBERRY_PI_DEPLOYMENT.md)**
 
-5. Verify that the Dashboard reflects real-time heartbeat (`deviceOnline: true`) and punch synchronization.
+5. Perform initial connectivity & state verification:
+   - Verify periodic HTTPS heartbeat delivery from the Raspberry Pi to the VPS.
+   - Verify `deviceOnline: true` in the Dashboard, confirming K14 LAN reachability reported by the Pi.
+   - Verify scheduled and manual punch synchronization operate cleanly.
 
 ---
 
@@ -348,11 +351,12 @@ npm run backup:remote:list
 ### STAGE 16: Disaster Recovery Test (Validation DB)
 Execute an isolated DR test restore into a temporary database:
 ```bash
-# 1. Download latest backup from R2
-npm run backup:remote:download -- <LATEST_DUMP_FILE>
+# 1. Download latest backup from R2 using FULL R2 key (e.g. <BACKUP_CLIENT_ID>/postgres/YYYY/MM/<DUMP_FILENAME>)
+# Note: Using the full R2 object key avoids ambiguous bare-filename lookups.
+npm run backup:remote:download -- <FULL_R2_KEY>
 
-# 2. Test-restore into temporary validation DB
-npm run backup:restore -- backups/postgres/<LATEST_DUMP_FILE> attendance_dr_test --keep
+# 2. Test-restore downloaded dump file into temporary validation DB
+npm run backup:restore -- backups/postgres/<DUMP_FILENAME> attendance_dr_test --keep
 
 # 3. Query records in attendance_dr_test
 POSTGRES_USER="$(grep -E '^POSTGRES_USER=' .env.docker | cut -d '=' -f2- | tr -d '\r\n"')"
@@ -365,7 +369,10 @@ docker exec zk_postgres psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE
 ---
 
 ### STAGE 17: Production Acceptance Sign-Off
-Complete all checklist items in [PRODUCTION_ACCEPTANCE_CHECKLIST.md](./PRODUCTION_ACCEPTANCE_CHECKLIST.md).
+Complete all checklist items and formal commissioning tests:
+- **[CLIENT_DEPLOYMENT_CHECKLIST.md](./CLIENT_DEPLOYMENT_CHECKLIST.md)**
+- **[CLIENT_ACCEPTANCE_TEST.md](./CLIENT_ACCEPTANCE_TEST.md)**
+- **[PRODUCTION_ACCEPTANCE_CHECKLIST.md](./PRODUCTION_ACCEPTANCE_CHECKLIST.md)**
 
 ---
 

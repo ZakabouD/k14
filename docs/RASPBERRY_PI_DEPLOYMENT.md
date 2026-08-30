@@ -279,7 +279,7 @@ pm2 stop zkteco-sync-worker
 | `Failed to connect to biometric device at ...:4370` | K14 IP changed, cable unplugged, or terminal powered off | Check physical ethernet connection, verify K14 IP screen menu, test with `ping <ZKTECO_IP>`. |
 | `Sync batch rejected with non-retryable status 401` | Invalid or rotated `DEVICE_TOKEN` | Re-provision token on VPS via `npm run docker:device:create` and update `.env`. |
 | `Sync batch rejected with non-retryable status 403` | Device marked `isActive: false` on server | Reactivate device in central dashboard or database. |
-| `Transient HTTP 502 / 503 / 504` | Central VPS temporarily undergoing restart | No action required; worker will retry with exponential backoff and resume automatically. |
+| `Transient HTTP 502 / 503 / 504` | Central VPS temporarily undergoing restart | No action required; worker will retry with increasing linear delay and resume automatically. |
 | `System clock synchronized: no` | Local network blocking UDP 123 (NTP) | Allow NTP port 123 in router firewall; check `sudo systemctl restart systemd-timesyncd`. |
 | `Worker exits / restarts immediately on startup` | Startup assertion failed (Timezone or Config) | Inspect `pm2 logs zkteco-sync-worker --lines 50` for exact pre-flight error banner. |
 
@@ -294,8 +294,17 @@ Before leaving the client installation site, verify every item:
 - [ ] **K14 Reachable:** `nc -z -w 3 <ZKTECO_IP> 4370` succeeds.
 - [ ] **Central API Reachable:** `curl -i https://<CLIENT_DOMAIN>/api/health` returns HTTP 200.
 - [ ] **Environment File Secured:** `/opt/attendance-bridge/.env` has permissions `600`.
-- [ ] **PM2 Online:** `pm2 status` shows `zkteco-sync-worker` with status `online` (0 restarts).
+- [ ] **PM2 Online:** `pm2 status` shows `zkteco-sync-worker` with status `online` and stable (not in crash loop).
 - [ ] **Boot Persistence Enabled:** `pm2 startup` and `pm2 save` executed.
 - [ ] **Log Rotation Configured:** `pm2-logrotate` installed and active.
-- [ ] **Heartbeat Reflected:** Central dashboard indicates `deviceOnline: true`.
+- [ ] **Heartbeat Delivered:** Periodic HTTPS heartbeat sent every 10s and accepted by VPS API.
+- [ ] **Device Online Confirmed:** Central dashboard indicates `deviceOnline: true`, confirming that the Pi reports the K14 as reachable over the local LAN.
 - [ ] **Zero Secrets in Logs:** `pm2 logs` contains no exposed token or password values.
+
+---
+
+## 7. Commissioning & Formal Acceptance
+
+After verifying the technical items above, execute the formal client acceptance testing protocol:
+- **[CLIENT_ACCEPTANCE_TEST.md](./CLIENT_ACCEPTANCE_TEST.md)**
+- **[CLIENT_DEPLOYMENT_CHECKLIST.md](./CLIENT_DEPLOYMENT_CHECKLIST.md)**
