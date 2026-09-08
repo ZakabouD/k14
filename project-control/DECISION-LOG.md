@@ -1,0 +1,19 @@
+# Decision Log
+
+Standing intent recorded 2026-09-08 from user/ChatGPT context; implementation evidence is in [CURRENT-STATE](CURRENT-STATE.md). Status vocabulary: ACTIVE (current policy), SUPERSEDED (replaced, keep replacement reference), UNDER REVIEW (no implied implementation approval).
+
+| ID | Decision | Status | Rationale / boundary |
+|---|---|---|---|
+| DEC-01 | Single tenant per client: VPS/DB/app/Pi/K14 by default | ACTIVE | Repeatable operational isolation without heavy multi-tenancy. |
+| DEC-02 | Commercial Pi sends via authenticated HTTPS; no exposed direct DB | ACTIVE | Keep database private and bridge auth explicit; source permits HTTP so deployment policy must enforce HTTPS. Legacy direct-DB code/history is not commercial authority. |
+| DEC-03 | Isolated K14 LAN on Pi eth0 where feasible | ACTIVE | Separate LAN-only terminal from site internet; validate subnet collisions and actual network profiles. LAB topology is an example, not client defaults. |
+| DEC-04 | Exactly one poller per K14 | ACTIVE | Protect live continuity/device state; never start another while legacy worker is active. |
+| DEC-05 | Use Africa/Casablanca IANA timezone | ACTIVE | Preserve Morocco civil-time behavior rather than hardcode UTC+1; worker guard/source and LAB observations support this. Future transition coverage is not inferred from two September punches. |
+| DEC-06 | Local verified backup + R2 + isolated DR | ACTIVE | Availability requires backup integrity and demonstrated recovery; prefix alone is not credential isolation; never restore over active production for tests. |
+| DEC-07 | Preserve raw punches and current dedup contract | ACTIVE | Idempotent replay under unique (zktecoUserId, recordTime); no Device in key, therefore no multi-terminal promise. No deletion of LAB/hardware data. |
+| DEC-08 | Distinguish raw attendance from adjusted business calculation | ACTIVE | D7 is a non-blocking presentation issue, not ingestion/timezone failure; home firstPunchIn may be effective start. |
+| DEC-09 | Separate physicalCheckIn/effectiveBillableStart in future | UNDER REVIEW | Improve HR semantics; requires approved model/runtime design, not a CONTROL-1 or SOP-3 edit. |
+| DEC-10 | Defer full provisioning automation until multiple deployments prove SOP | ACTIVE | Avoid encoding unsafe or untested runbook assumptions; SOP-4 remains limited design. |
+| DEC-11 | Separate orchestration, implementation and independent audit | ACTIVE | ChatGPT sequences/accepts, Work inspects/challenges, Antigravity implements, Claude audits, Lovable explores UI; see [roles](AGENT-ROLES.md). |
+| DEC-12 | Qualify a supported Pi Node runtime separately | UNDER REVIEW | Node 20 LAB proof is historical; VPS Node 22 does not establish Pi replacement compatibility. |
+| DEC-13 | Resolve SOP draft against current code and historical evidence | ACTIVE | Newer document date does not override working safeguards; SOP-3 must establish canonical links and retire contradictions explicitly. |

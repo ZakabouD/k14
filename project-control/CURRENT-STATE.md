@@ -1,0 +1,53 @@
+# Current State
+
+Observed 2026-09-08 in commercial checkout `zk-k14-commercial`: branch **commercial**, HEAD **a36facc63d3ce726b7e499114f37e17b631be346**, unchanged from the supplied reference. Separate main/live checkout `zk-k14-test` was listed by Git at `aa4d917`; it was not inspected or modified. CONTROL-1 adds only this control directory; no commit, staging or runtime execution.
+
+## Phase and evidence
+
+CONTROL-1 governance pack was reconciled through CONTROL-2/CONTROL-2R and formally accepted by ChatGPT. **SOP-3 documentation consolidation** is the next phase. Historical last accepted major result: **D7 READY WITH NON-BLOCKING NOTES**. Phases 4.3, 4.4-B/B1, C1, C2, D1–D7, SOP-1 and SOP-2 are historically complete with their recorded qualifications; see [roadmap](ROADMAP.md) and [register](VALIDATION-REGISTER.md). Current deployed health and credential status were not checked.
+
+## Current repository stack — CODE-PROVEN declarations
+
+| Component | Observed source | Qualification |
+|---|---|---|
+| Next.js / React | 16.2.6 / 19.2.4 in [dashboard manifest](../dashboard/package.json); App Router directory present | Manifest versions, not running installation. |
+| Tailwind | v4 declared in dashboard manifest | Range, not independent installed-version check. |
+| Prisma | ^7.8.0 in [root manifest](../package.json) and dashboard | Range, not claim of exact current runtime version. |
+| Database / proxy | postgres:16-alpine and caddy:2-alpine in [Compose](../docker-compose.yml) | Deployment definitions. |
+| VPS Node | node:22-alpine in [Dockerfile](../Dockerfile) | Different role from historically tested Pi Node 20.20.2. |
+| Pi bridge | Node/TypeScript; zkteco-js ^1.7.1; [entrypoint](../src/index.ts) bootstraps dotenv then config/timezone guards; root [tsconfig](../tsconfig.json) includes `src/**/*` | PM2 operation is historical evidence, not checked now. Root TypeScript configuration includes wider `src/` tree, so source compilation pulls in server/Prisma-dependent files unless build scope is isolated. |
+| Authentication | jose HS256 in [session](../dashboard/src/lib/session.ts); bcrypt comparison in [actions](../dashboard/src/app/actions.ts); header/token-hash device auth in [device-auth](../dashboard/src/lib/device-auth.ts) | Static source inspection only. |
+| Data / settings | RawPunch unique (zktecoUserId, recordTime), DH/Africa/Casablanca defaults and optional logoUrl in [schema](../prisma/schema.prisma) | No Device in dedup key; logo field is not a finished white-label storage workflow. |
+| Backups | Local PostgreSQL custom-format archive (`.dump` via `pg_dump -Fc` verified with `pg_restore --list`), `.sha256` checksum sidecar, `.complete` marker, and R2 sync in [backup-full](../scripts/backup-full.sh) and [uploader](../scripts/upload-backup-r2.sh) | Custom archive format (not a tarball); transport (TLS) and R2 provider storage encryption apply (no client-side/application-level encryption). R2 credentials and actual scope not inspected. |
+
+## Open field-deployment blockers — SOP-2, statically corroborated
+
+| ID | Conflict / consequence | SOP-3 correction |
+|---|---|---|
+| B1 | [02](../docs/client-deployment/02-VPS-INSTALLATION.md) sets DOMAIN; Compose/Caddy read APP_DOMAIN with localhost fallback. | Use actual domain contract and safe non-secret verification. |
+| B2 | [03](../docs/client-deployment/03-APPLICATION-PROVISIONING.md) uses ON CONFLICT(name) for Shift; schema name has no unique constraint. | Document valid existing provisioning; no schema change in SOP-3. |
+| B3 | [04](../docs/client-deployment/04-RASPBERRY-PI-INSTALLATION.md) installs production-only dependencies then builds; TypeScript/dotenv tooling is in devDependencies, root tsconfig.json compiles wider src tree (entering Prisma dependencies), and Prisma generation is omitted. | Complete dependency/build/bootstrap sequence against source and older Pi runbook; address build scope and prerequisites in documentation without prescribing runtime redesign. |
+| B4 | [02](../docs/client-deployment/02-VPS-INSTALLATION.md) prints secret fields and creates credential temp file before chmod; provisioning also needs protected token output. | Redacted validation, restrictive creation permissions and secure handover; no credentials in transcripts. |
+| B5 | Ubuntu Docker repository commands in [02](../docs/client-deployment/02-VPS-INSTALLATION.md), while onboarding permits Debian. | Narrow supported OS or explicitly document qualified OS-specific paths. |
+| B6 | [07](../docs/client-deployment/07-BACKUP-AND-DR.md) claims UTC for bare cron without timezone control and assumes log permissions/dependencies. Existing [scheduler](../scripts/install-backup-schedule.sh) uses Casablanca; uploader requires AWS CLI. | Reconcile scheduler, dependency/PATH/log permissions and supported timezone semantics. |
+
+Additional SOP-3 corrections: restore canonical device provisioning; use SYNC_INTERVAL_CRON (not SYNC_CRON); distinguish Compose services from container names; remove docker system prune as a log-cleaning remedy; diagnose locks safely; discover network profiles instead of assuming names; distinguish R2 prefix from credential scope; handle SSH recovery/sudo before hardening; replace LAB-specific acceptance identities. Address Moroccan onboarding, privacy/biometric/legal review responsibilities, HR policy sign-off and multi-terminal scope without claiming compliance already validated.
+
+## Product/security notes and contradictions
+
+- D7's adjusted firstPunchIn is supported by current calculation/action source: raw 19:32:41 becomes effective 20:00:41, later than checkout 19:56:20, zero regular hours, status OK. Exact historical values/UI are REPORT-ONLY here. Raw timeline fidelity passed historically. This was accepted as non-blocking UX; future physicalCheckIn/effectiveBillableStart separation requires an approved runtime phase.
+- LAB PasswordAuthentication remained enabled after D6; key login worked but noninteractive sudo hardening was incomplete. This is not a fully hardened SSH baseline.
+- D7 printed an admin password: treat it as compromised until rotated before real Client #1. Earlier LAB token, temporary Pi password and R2 exposures were reportedly rotated; no current recheck. See [security boundaries](SAFETY-BOUNDARIES.md).
+- `src/scripts/seed.ts` generates a random 24-character hexadecimal admin password only when initialization/settings creation is required and `ADMIN_PASSWORD` is missing, empty, or whitespace-only, printing that generated password to stdout. If `SystemSettings` already exist, this initialization path is skipped. Future SOP must require deliberate secure credential handling and environment configuration during provisioning; never reproduce credentials in transcripts.
+- Pi Node 20.20.2 was physically tested, but Node 20 is EOL per the [official Node release table](https://nodejs.org/en/about/previous-releases), checked 2026-09-08. VPS Node 22 definition does not qualify a Pi migration. Future supported Pi runtime needs separate qualification.
+- HTTPS is deployment policy, but [worker validation](../src/config/worker-config.ts) accepts HTTP or HTTPS and [API client](../src/services/api-client.ts) has a localhost HTTP fallback. Do not claim the code enforces HTTPS-only. Flag to ChatGPT; do not change runtime in SOP-3.
+- Canonical [device-create](../src/scripts/device-create.ts) hashes tokens but prints raw output; rerunning an existing ID rotates its credential. It is neither a harmless read nor safe to capture verbatim.
+- Multi-terminal/multi-K14 is NOT-VALIDATED; dedup lacks Device. Dynamic logo/white-label asset storage is not fully validated despite optional logoUrl and unrelated untracked brand assets.
+- Backups are PostgreSQL custom archives (`.dump` via `pg_dump -Fc` verified with `pg_restore --list`) with `.sha256` checksums and `.complete` metadata markers. They are not tarballs and do not have application-level/client-side encryption; encryption is provided by transport TLS and Cloudflare R2 server-side storage. R2 prefix separation (`${BACKUP_CLIENT_ID}/postgres/`) is logical, not credential-level tenant isolation. A flock file's existence does not establish a held/stale lock; deleting it can undermine mutual exclusion. Review process ownership and locking mode first.
+- D4–D7 extend the earlier deferred physical acceptance, but LAB success does not prove a repeatable clean-client SOP or present production readiness. The SOP-1 claim of operational readiness is contradicted by B1–B6.
+
+## Preserved baseline and next action
+
+Pre-existing untracked paths: `branding/`, `dashboard/public/brand/`, `docs/BRAND_FOUNDATION.md`, `docs/EXPLORATION_NOMS.md`, `docs/IDENTITE_TEMYO.md`, `docs/client-deployment/`, `website/`. No tracked changes existed initially. All are preserved. This pack is uncommitted, so future sessions must use this checkout or deliberately transfer these files; HEAD alone does not contain them.
+
+Proceed only to proposed SOP-3 scope after orchestration: consolidate documentation, resolve B1–B6 and supplementary gaps, preserve old-runbook safeguards, report runtime issues separately. Real Client #1 also requires credential closure, safe SSH/recovery plan, supported runtime qualification and client onboarding/HR/privacy decisions. No runtime change or deployment is authorized by this handoff.

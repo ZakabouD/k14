@@ -1,0 +1,46 @@
+# Validation Register
+
+Recorded 2026-09-08 against commercial a36facc63d3ce726b7e499114f37e17b631be346. Read the [evidence model](PROJECT-BRAIN.md). **No historical deployment, hardware, database, backup, SSH or UI test was re-executed in CONTROL-1.** Combined REPORT-ONLY plus historical proof labels mean the reported test had that scope, not independent current confirmation. CODE-PROVEN applies only to the explicitly described source fact in a mixed row. NOT-VALIDATED identifies the stated unresolved part, not denial of the historical observation.
+
+Historical provenance: the user-supplied CONTROL-1 phase account and the referenced ChatGPT conversation “Architecture Déploiement Client Unique”, conversation ID `6a847224-d4d4-83ea-93bb-580dcfd39811` (recent summaries retrieved). Full raw logs were not copied or independently authenticated. Repository runbook links below are implementation/context references, not substitute execution logs. Chronology and verdicts are in [ROADMAP](ROADMAP.md).
+
+| ID | Claim | Labels | Evidence/source phase | Result | Limitation |
+|---|---|---|---|---|---|
+| VAL-01 | Commercial API health | CODE-PROVEN + EXECUTION-PROVEN + REPORT-ONLY | D1/D6; [health route](../dashboard/src/app/api/health/route.ts) | Historical HTTPS 200; source queries DB and returns 200/503 | No endpoint contacted now; does not certify whole deployment. |
+| VAL-02 | Canonical device provisioning | CODE-PROVEN + EXECUTION-PROVEN + REPORT-ONLY | C1/D3/D4; [script](../src/scripts/device-create.ts), [manifest](../package.json) | Historical local qualification and DEV-LAB-K14-01 provisioning PASS; source hashes random token/upserts | Prints raw token; repeat existing ID rotates it. Not executed here. |
+| VAL-03 | Pi worker build/deploy | CODE-PROVEN + PHYSICAL-PROVEN + REPORT-ONLY | B1/D3/D4; [entrypoint](../src/index.ts), [config](../src/config/worker-config.ts) | LAB PM2 online/heartbeat; dotenv and guards in source | No fresh build; SOP Pi sequence remains blocked; D3 incident recovered after controlled power cycle. |
+| VAL-04 | K14 connectivity | PHYSICAL-PROVEN + REPORT-ONLY | D1/D2/D3; user-supplied phase history | Dedicated Pi intake/network/NTP PASS; isolated eth0 ping/TCP 4370 PASS | Single dedicated LAB device; not live or arbitrary site topology. |
+| VAL-05 | First physical fingerprint E2E | PHYSICAL-PROVEN + REPORT-ONLY | D4; supplied phase history | Factory-fresh users/punches zero; enrolled user 1 LAB TEST; first punch 2026-09-07 19:32:41 local inserted once; daily report created | One LAB path only; hardware not contacted in CONTROL-1. |
+| VAL-06 | Timestamp fidelity | CODE-PROVEN + PHYSICAL-PROVEN + PRODUCT-PROVEN + REPORT-ONLY | D4/D6/D7; [timezone guard](../src/config/timezone.ts) | First 19:32:41 Casablanca -> 18:32:41 UTC -> exact local, 0-second drift; UI timezone observed | Source guard does not prove runtime; two September samples do not cover timezone transitions. |
+| VAL-07 | First replay dedup | CODE-PROVEN + PHYSICAL-PROVEN + REPORT-ONLY | D4; [schema](../prisma/schema.prisma), [sync route](../dashboard/src/app/api/device/sync/route.ts) | Inserted 0, duplicate 1; source unique pair/skipDuplicates | Device not part of dedup key; no cross-terminal guarantee. |
+| VAL-08 | Second physical punch | PHYSICAL-PROVEN + REPORT-ONLY | D6; supplied phase history | Actual K14 2026-09-07 19:56:20 local; DB 18:56:20 UTC; RawPunch count 2 | Human observed 19:56 only; second human comparison is minute precision, hardware-to-DB includes seconds. |
+| VAL-09 | Final replay dedup | CODE-PROVEN + PHYSICAL-PROVEN + REPORT-ONLY | D6; [sync route](../dashboard/src/app/api/device/sync/route.ts) | Received 2, inserted 0, duplicates 2; Pi/service/API health PASS | Historical replay scope only; not newly executed. |
+| VAL-10 | CalculatedDailyReport behavior | CODE-PROVEN + PHYSICAL-PROVEN + REPORT-ONLY | D4/D7; [server calculation](../dashboard/src/lib/server-calculation.ts), [calculation service](../src/services/calculation.service.ts) | 08:00 shift penalty transforms 19:32:41 into effective 20:00:41; lastPunchOut 19:56:20; regularHours 0/status OK | Exact data historical; code adjusts firstPunchIn. Not general payroll/HR policy acceptance. |
+| VAL-11 | Dashboard raw punch display | PRODUCT-PROVEN + REPORT-ONLY | D7; supplied report and referenced conversation | Reports showed 19:32 and 19:56; Casablanca timezone visually verified; connected device/bridge/DB indicators | No browser opened here; minute display does not prove seconds. |
+| VAL-12 | Dashboard penalized Home card | CODE-PROVEN + PRODUCT-PROVEN + REPORT-ONLY | D7; [actions](../dashboard/src/app/actions.ts) | Entrée à 20:00 observed; source Home detail consumes report firstPunchIn | Accepted non-blocking UX; future physical/effective field separation unimplemented in this phase. |
+| VAL-13 | PM2 reboot persistence | PHYSICAL-PROVEN + REPORT-ONLY | D5; supplied history | pm2-labadmin systemd startup; controlled reboot auto-started worker and resumed heartbeat | One controlled LAB reboot; no current service inspection. |
+| VAL-14 | Short API outage recovery | PHYSICAL-PROVEN + REPORT-ONLY | D5; supplied history | Pi-side route simulated short API outage; worker did not crash and recovered | Not evidence for prolonged outages, local durable queue, all failures or lossless recovery scenarios. |
+| VAL-15 | Backup creation/checksum | EXECUTION-PROVEN + REPORT-ONLY | D5; supplied history; implementation reference [backup runbook](../docs/BACKUP_RUNBOOK.md) | Real acceptance-data PostgreSQL custom archive (`.dump` via `pg_dump -Fc`) created; validated with `pg_restore --list` and `.sha256` checksum sidecar | No backup run now; does not prove scheduler operation or long-term retention. Not a tarball. |
+| VAL-16 | R2 upload | EXECUTION-PROVEN + REPORT-ONLY | D5; supplied history | Acceptance backup uploaded under client-opaxia-store prefix with `.complete` marker; transport (TLS) and provider storage encryption | Prefix is logical separation; credential-level client isolation unverified; no client-side application encryption. |
+| VAL-17 | Isolated DR restore | EXECUTION-PROVEN + REPORT-ONLY | D5; supplied history | Temporary DB restored with real acceptance data; production untouched | Not a full VPS-loss/rebuild drill; no RTO/RPO guarantee inferred. |
+| VAL-18 | SSH key auth after password rotation | EXECUTION-PROVEN + REPORT-ONLY | D6; supplied history | Private interactive password rotation followed by successful key auth | No key/password inspected; host-key continuity was weaker than out-of-band verification. |
+| VAL-19 | PasswordAuthentication hardening | REPORT-ONLY + NOT-VALIDATED | D6; supplied history | Incomplete: password authentication remained enabled; sudo hardening not completed noninteractively | Key-only hardened baseline NOT-VALIDATED; recovery/sudo plan required before future changes. |
+| VAL-20 | Multi-terminal / multi-K14 | CODE-PROVEN + NOT-VALIDATED | Current [schema](../prisma/schema.prisma); program scope | Source dedup excludes Device; single Pi/K14 only physically proven | No multi-terminal support promise, collision handling or user identity reconciliation proof. |
+| VAL-21 | Dynamic branding / white-label storage | CODE-PROVEN + NOT-VALIDATED | Current [schema](../prisma/schema.prisma); supplied limitation | Optional logoUrl exists; complete dynamic asset storage/workflow not proven | Untracked branding assets are not end-to-end white-label capability proof; left untouched. |
+| VAL-22 | Node runtime and future support | CODE-PROVEN + PHYSICAL-PROVEN + REPORT-ONLY + NOT-VALIDATED | D2; [Dockerfile](../Dockerfile); [official Node releases](https://nodejs.org/en/about/previous-releases), checked 2026-09-08 | LAB Node 20.20.2 physically passed historically; Node 20 EOL; VPS definition Node 22 | Supported Pi migration NOT-VALIDATED. Official lifecycle lookup is external reference, not CODE/EXECUTION proof of support compatibility. |
+| VAL-23 | Commercial API auth contract | CODE-PROVEN | Current [device-auth](../dashboard/src/lib/device-auth.ts), [API client](../src/services/api-client.ts) | Header-based identity/token; SHA-256 hash and constant-time comparison, active-device check | No current auth request executed; HTTPS required operationally but HTTP accepted by worker config. |
+
+## Summary counts
+
+23 claim rows; labels overlap and must not be summed as separate tests.
+
+| Label | Rows |
+|---|---:|
+| CODE-PROVEN | 12 |
+| EXECUTION-PROVEN | 6 |
+| PHYSICAL-PROVEN | 11 |
+| PRODUCT-PROVEN | 3 |
+| REPORT-ONLY | 20 |
+| NOT-VALIDATED | 4 |
+
+Only current source inspection adds new project implementation evidence in CONTROL-1. Historical acceptance remains bounded by the reported LAB environment; present operational readiness is not inferred.
