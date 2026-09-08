@@ -1,6 +1,16 @@
 # Session Handoff — read after PROJECT-BRAIN
 
-Updated 2026-09-08. CONTROL-1 governance pack was reconciled in CONTROL-2/CONTROL-2R and formally **ACCEPTED BY CHATGPT**. (CONTROL-2 initial review contained mapping and claim errors; CONTROL-2R corrected them against source and logs). **Next proposed phase: SOP-3 — documentation consolidation.** Last accepted major operational result: **D7 READY WITH NON-BLOCKING NOTES** (historical). SOP-2 deep read-only review is complete; SOP-3 remains pending. Do not rerun physical acceptance just to refresh context.
+Updated 2026-09-08. **SOP-3 documentation consolidation was formally ACCEPTED BY CHATGPT** following independent Work verification in SOP-3H (`PASS — SOP-3 READY FOR CHATGPT ACCEPTANCE`). Canonicalization of accepted SOP and project-control state is being finalized in CONTROL-SOP3-1.
+
+## Operational Authority Baseline
+- **Canonical Deployment Documentation:** `docs/client-deployment/` is now the canonical operator standard for all new commercial client installations.
+- **Legacy Deployment Runbooks:** Legacy documentation outside `docs/client-deployment/` (`docs/PRODUCTION_DEPLOYMENT.md`, `docs/RASPBERRY_PI_DEPLOYMENT.md`, `docs/BACKUP_RUNBOOK.md`, `docs/CLIENT_DEPLOYMENT_CHECKLIST.md`, `docs/CLIENT_ACCEPTANCE_TEST.md`, `docs/PRODUCTION_ACCEPTANCE_CHECKLIST.md`) is **REFERENCE-ONLY / SUPERSEDED FOR NEW COMMERCIAL DEPLOYMENTS**.
+- **Next Major Technical Phase:** **SUPPORTED PI RUNTIME QUALIFICATION** (formal physical qualification of Node.js 22 LTS on ARM64 Raspberry Pi OS Lite / Debian 12 Bookworm).
+- **Client #1 Production Deployment:** **NOT AUTHORIZED**.
+
+## Client #1 Explicit Blockers
+1. **Supported Pi Runtime Qualification:** `PENDING`. Node.js 20.20.2 was physically tested in LAB historically, but Node 20 is EOL. Node 22 LTS ARM64 / supported future runtime is `NOT-VALIDATED` on target Pi deployment hardware.
+2. **Historical D7 Admin Credential Closure:** `PENDING OPERATIONAL EVIDENCE`. No new operational evidence proves the historically exposed D7 admin password was rotated/closed on target environments.
 
 Key accepted baseline truths:
 - PasswordAuthentication remained enabled on LAB Pi (key-only hardening NOT-VALIDATED).
@@ -9,20 +19,11 @@ Key accepted baseline truths:
 - D5B reboot was a controlled software reboot (not a cold power cycle).
 - Backups are PostgreSQL custom `.dump` archives with `.sha256` sidecars, transport TLS, and R2 provider storage encryption (not tarballs; no application-level client-side encryption).
 
-Repo: branch commercial, HEAD a36facc63d3ce726b7e499114f37e17b631be346, unchanged. This pack and docs/client-deployment are uncommitted; preserve them and unrelated branding/website files. Recheck branch/HEAD/status every session. Read [CURRENT-STATE](CURRENT-STATE.md) for source conflicts and [SAFETY-BOUNDARIES](SAFETY-BOUNDARIES.md) before action.
-
-## Six SOP-2 blockers
-
-1. B1: draft sets DOMAIN, while Compose/Caddy require APP_DOMAIN.
-2. B2: Shift ON CONFLICT(name) is invalid against current nonunique name field.
-3. B3: production-only Pi install omits build tooling/bootstrap requirements and Prisma generation.
-4. B4: secret-printing checks and credential temp-file permissions are unsafe; canonical provisioning also prints its token.
-5. B5: Ubuntu-only Docker repository instructions conflict with claimed Debian support.
-6. B6: backup scheduler/dependencies/PATH/log permissions/timezone assumptions need reconciliation.
+Repo: branch commercial, HEAD 924532bba9a73951907549042b32276d4cb8b47e. This control pack and `docs/client-deployment/` are uncommitted; preserve them and unrelated branding/website files. Recheck branch/HEAD/status every session. Read [CURRENT-STATE](CURRENT-STATE.md) and [SAFETY-BOUNDARIES](SAFETY-BOUNDARIES.md) before action.
 
 ## Exact next task
 
-Consolidate docs/client-deployment against current source and older runbooks, addressing B1–B6 and the supplementary findings in CURRENT-STATE. Restore canonical device provisioning with protected secret handling, SYNC_INTERVAL_CRON, correct Compose service identifiers, safe lock/network diagnostics, R2 scope limitations, SSH recovery nuances, supported-runtime qualification boundaries and client-neutral acceptance. Include Moroccan onboarding/privacy/biometric/legal/HR decisions and explicit single-terminal scope. Establish document hierarchy and preserve safeguards. Report any necessary runtime correction separately to ChatGPT; **no runtime/schema/dependency/deployment-script changes, deployment, infrastructure contact, database actions or commit** in the proposed docs-only phase.
+Proceed to **CONTROL-SOP3-2 Work verification** of the canonicalization and commit scope review. Once verified, prepare for the **Supported Pi Runtime Qualification** phase. Real Client #1 deployment remains blocked until both Pi runtime qualification is complete and operational evidence of D7 admin credential closure is established.
 
 ## Safety and release reminders
 

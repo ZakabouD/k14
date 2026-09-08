@@ -1,10 +1,21 @@
 # Current State
 
-Observed 2026-09-08 in commercial checkout `zk-k14-commercial`: branch **commercial**, HEAD **a36facc63d3ce726b7e499114f37e17b631be346**, unchanged from the supplied reference. Separate main/live checkout `zk-k14-test` was listed by Git at `aa4d917`; it was not inspected or modified. CONTROL-1 adds only this control directory; no commit, staging or runtime execution.
+Observed 2026-09-08 in commercial checkout `zk-k14-commercial`: branch **commercial**, HEAD **924532bba9a73951907549042b32276d4cb8b47e**, unchanged from the supplied reference. Separate main/live checkout `zk-k14-test` was listed by Git at `aa4d917`; it was not inspected or modified. CONTROL-1 adds only this control directory; no commit, staging or runtime execution.
 
 ## Phase and evidence
 
-CONTROL-1 governance pack was reconciled through CONTROL-2/CONTROL-2R and formally accepted by ChatGPT. **SOP-3 documentation consolidation** is the next phase. Historical last accepted major result: **D7 READY WITH NON-BLOCKING NOTES**. Phases 4.3, 4.4-B/B1, C1, C2, D1–D7, SOP-1 and SOP-2 are historically complete with their recorded qualifications; see [roadmap](ROADMAP.md) and [register](VALIDATION-REGISTER.md). Current deployed health and credential status were not checked.
+CONTROL-1 governance pack was reconciled through CONTROL-2/CONTROL-2R and formally accepted by ChatGPT. **SOP-3 documentation consolidation was formally ACCEPTED by ChatGPT Project Brain** following SOP-3H independent Work verification (`PASS — SOP-3 READY FOR CHATGPT ACCEPTANCE`).
+
+- **Canonical Commercial Deployment Documentation:** `docs/client-deployment/` is now the canonical operator standard for all new commercial client installations.
+- **Legacy Deployment Documentation:** Legacy runbooks outside `docs/client-deployment/` (`docs/PRODUCTION_DEPLOYMENT.md`, `docs/RASPBERRY_PI_DEPLOYMENT.md`, `docs/BACKUP_RUNBOOK.md`, `docs/CLIENT_DEPLOYMENT_CHECKLIST.md`, `docs/CLIENT_ACCEPTANCE_TEST.md`, `docs/PRODUCTION_ACCEPTANCE_CHECKLIST.md`) are **REFERENCE-ONLY / SUPERSEDED FOR NEW COMMERCIAL DEPLOYMENTS**.
+- **Next Major Technical Phase:** **SUPPORTED PI RUNTIME QUALIFICATION**.
+- **Client #1 Production Deployment:** **NOT AUTHORIZED**.
+
+### Client #1 Explicit Blockers:
+1. **BLOCKER A — Supported Pi Runtime Qualification:** `PENDING`. Node.js 20.20.2 was physically proven historically in LAB, but Node 20 is EOL. Node.js 22 LTS ARM64 / future supported runtime is `NOT-VALIDATED` on the target Pi deployment profile.
+2. **BLOCKER B — Historical D7 Admin Credential Closure:** `PENDING OPERATIONAL EVIDENCE`. No new operational evidence proves the historically exposed D7 admin credential was rotated/closed. (Documentation improvements to seed/deployment workflows do not constitute operational rotation evidence).
+
+Historical last accepted major operational result: **D7 READY WITH NON-BLOCKING NOTES**. Phases 4.3, 4.4-B/B1, C1, C2, D1–D7, SOP-1, SOP-2, CONTROL-1/2/2R, and SOP-3 are complete with their recorded qualifications; see [roadmap](ROADMAP.md) and [register](VALIDATION-REGISTER.md). Current deployed health and credential status were not checked.
 
 ## Current repository stack — CODE-PROVEN declarations
 
@@ -20,7 +31,7 @@ CONTROL-1 governance pack was reconciled through CONTROL-2/CONTROL-2R and formal
 | Data / settings | RawPunch unique (zktecoUserId, recordTime), DH/Africa/Casablanca defaults and optional logoUrl in [schema](../prisma/schema.prisma) | No Device in dedup key; logo field is not a finished white-label storage workflow. |
 | Backups | Local PostgreSQL custom-format archive (`.dump` via `pg_dump -Fc` verified with `pg_restore --list`), `.sha256` checksum sidecar, `.complete` marker, and R2 sync in [backup-full](../scripts/backup-full.sh) and [uploader](../scripts/upload-backup-r2.sh) | Custom archive format (not a tarball); transport (TLS) and R2 provider storage encryption apply (no client-side/application-level encryption). R2 credentials and actual scope not inspected. |
 
-## Open field-deployment blockers — SOP-2, statically corroborated
+## Historical SOP-2 Findings — Resolved / Superseded through Accepted SOP-3
 
 | ID | Conflict / consequence | SOP-3 correction |
 |---|---|---|
@@ -50,4 +61,4 @@ Additional SOP-3 corrections: restore canonical device provisioning; use SYNC_IN
 
 Pre-existing untracked paths: `branding/`, `dashboard/public/brand/`, `docs/BRAND_FOUNDATION.md`, `docs/EXPLORATION_NOMS.md`, `docs/IDENTITE_TEMYO.md`, `docs/client-deployment/`, `website/`. No tracked changes existed initially. All are preserved. This pack is uncommitted, so future sessions must use this checkout or deliberately transfer these files; HEAD alone does not contain them.
 
-Proceed only to proposed SOP-3 scope after orchestration: consolidate documentation, resolve B1–B6 and supplementary gaps, preserve old-runbook safeguards, report runtime issues separately. Real Client #1 also requires credential closure, safe SSH/recovery plan, supported runtime qualification and client onboarding/HR/privacy decisions. No runtime change or deployment is authorized by this handoff.
+SOP-3 documentation consolidation is complete and formally accepted. The next major technical phase is **SUPPORTED PI RUNTIME QUALIFICATION** (formal qualification of Node.js 22 LTS ARM64 on target Pi deployment profile to replace EOL Node 20). Client #1 production deployment remains NOT AUTHORIZED pending resolution of both Pi runtime qualification and operational D7 admin credential closure. No runtime change or deployment is authorized by this handoff.
