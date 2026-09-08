@@ -26,3 +26,19 @@ backups/**/*.sql
 backups/**/*.tar
 backups/**/*.gz
 !backups/**/.gitkeep
+
+# Private keys / credential containers
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+# Local editor/temp files
+.idea/
+*.swp
+*.swo
+*~
+
