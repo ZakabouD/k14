@@ -8,7 +8,7 @@ Historical provenance: the user-supplied CONTROL-1 phase account and the referen
 |---|---|---|---|---|---|
 | VAL-01 | Commercial API health | CODE-PROVEN + EXECUTION-PROVEN + REPORT-ONLY | D1/D6; [health route](../dashboard/src/app/api/health/route.ts) | Historical HTTPS 200; source queries DB and returns 200/503 | No endpoint contacted now; does not certify whole deployment. |
 | VAL-02 | Canonical device provisioning | CODE-PROVEN + EXECUTION-PROVEN + REPORT-ONLY | C1/D3/D4; [script](../src/scripts/device-create.ts), [manifest](../package.json) | Historical local qualification and DEV-LAB-K14-01 provisioning PASS; source hashes random token/upserts | Prints raw token; repeat existing ID rotates it. Not executed here. |
-| VAL-03 | Pi worker build/deploy | CODE-PROVEN + PHYSICAL-PROVEN + REPORT-ONLY | B1/D3/D4; [entrypoint](../src/index.ts), [config](../src/config/worker-config.ts) | LAB PM2 online/heartbeat; dotenv and guards in source | No fresh build; SOP Pi sequence remains blocked; D3 incident recovered after controlled power cycle. |
+| VAL-03 | Pi worker build/deploy | CODE-PROVEN + PHYSICAL-PROVEN + REPORT-ONLY | B1/D3/D4; [entrypoint](../src/index.ts), [config](../src/config/worker-config.ts) | LAB PM2 online/heartbeat; dotenv and guards in source | Historical D3/D4 physical worker baseline; SOP Pi sequence was historically blocked, but runtime qualification gate is now CLOSED / QUALIFIED following PI-RUNTIME-2 on Node 24.20.0 LTS / Debian 13.5 trixie ARM64. D7 admin credential closure remains pending operational evidence. |
 | VAL-04 | K14 connectivity | PHYSICAL-PROVEN + REPORT-ONLY | D1/D2/D3; user-supplied phase history | Dedicated Pi intake/network/NTP PASS; isolated eth0 ping/TCP 4370 PASS | Single dedicated LAB device; not live or arbitrary site topology. |
 | VAL-05 | First physical fingerprint E2E | PHYSICAL-PROVEN + REPORT-ONLY | D4; supplied phase history | Factory-fresh users/punches zero; enrolled user 1 LAB TEST; first punch 2026-09-07 19:32:41 local inserted once; daily report created | One LAB path only; hardware not contacted in CONTROL-1. |
 | VAL-06 | Timestamp fidelity | CODE-PROVEN + PHYSICAL-PROVEN + PRODUCT-PROVEN + REPORT-ONLY | D4/D6/D7; [timezone guard](../src/config/timezone.ts) | First 19:32:41 Casablanca -> 18:32:41 UTC -> exact local, 0-second drift; UI timezone observed | Source guard does not prove runtime; two September samples do not cover timezone transitions. |
@@ -27,20 +27,22 @@ Historical provenance: the user-supplied CONTROL-1 phase account and the referen
 | VAL-19 | PasswordAuthentication hardening | REPORT-ONLY + NOT-VALIDATED | D6; supplied history | Incomplete: password authentication remained enabled; sudo hardening not completed noninteractively | Key-only hardened baseline NOT-VALIDATED; recovery/sudo plan required before future changes. |
 | VAL-20 | Multi-terminal / multi-K14 | CODE-PROVEN + NOT-VALIDATED | Current [schema](../prisma/schema.prisma); program scope | Source dedup excludes Device; single Pi/K14 only physically proven | No multi-terminal support promise, collision handling or user identity reconciliation proof. |
 | VAL-21 | Dynamic branding / white-label storage | CODE-PROVEN + NOT-VALIDATED | Current [schema](../prisma/schema.prisma); supplied limitation | Optional logoUrl exists; complete dynamic asset storage/workflow not proven | Untracked branding assets are not end-to-end white-label capability proof; left untouched. |
-| VAL-22 | Node runtime and future support | CODE-PROVEN + PHYSICAL-PROVEN + REPORT-ONLY + NOT-VALIDATED | D2; [Dockerfile](../Dockerfile); [official Node releases](https://nodejs.org/en/about/previous-releases), checked 2026-09-08 | LAB Node 20.20.2 physically passed historically; Node 20 EOL; VPS definition Node 22 | Supported Pi migration NOT-VALIDATED. Official lifecycle lookup is external reference, not CODE/EXECUTION proof of support compatibility. |
+| VAL-22 | Supported commercial Pi Node runtime | CODE-PROVEN + EXECUTION-PROVEN + PHYSICAL-PROVEN | PI-RUNTIME-1S / PI-RUNTIME-2A–2E; commit `f5eae2fd20b36904a6793fbfee90e86cb5b9765f` | Node.js 24.20.0 LTS, npm 11.19.0, PM2 7.0.4 on Debian GNU/Linux 13.5 trixie ARM64; build from commercial commit PASS; single poller enforced; physical fingerprint punch ingested into cloud API (Received 4 / Inserted 1 / Duplicates 3); replay dedup PASS (Received 4 / Inserted 0 / Duplicates 4); PM2 supervisor and worker migrated to `/opt/node24/bin/node` PASS; software reboot persistence PASS with automatic ENETUNREACH retry recovery on second connection attempt | Debian 12 bookworm was not tested in PI-RUNTIME-2 and remains NOT-VALIDATED. Node 20 is EOL (retained as rollback reference only). Controlled software reboot proven; cold power-loss / unplug-and-replug test remains NOT-VALIDATED. Multi-terminal NOT-VALIDATED. Prolonged API outage buffering NOT-VALIDATED. Client #1 remains blocked by D7 credential closure. |
 | VAL-23 | Commercial API auth contract | CODE-PROVEN | Current [device-auth](../dashboard/src/lib/device-auth.ts), [API client](../src/services/api-client.ts) | Header-based identity/token; SHA-256 hash and constant-time comparison, active-device check | No current auth request executed; HTTPS required operationally but HTTP accepted by worker config. |
+| VAL-24 | Node24 PM2 supervisor migration & reboot recovery | EXECUTION-PROVEN + PHYSICAL-PROVEN | PI-RUNTIME-2E; physical LAB testing | Controlled systemd restart migrated PM2 daemon to `/opt/node24/bin/node`; full software reboot auto-started `pm2-labadmin.service`; worker resurrected under `/opt/node24/bin/node`; transient startup `connect ENETUNREACH` before network carrier was automatically recovered by built-in retry without crash loop | Validates controlled software reboot; does NOT prove cold power interruption / power-cut recovery. |
+| VAL-25 | Cold power-loss / unplug-and-replug resilience | NOT-VALIDATED | PI-RUNTIME-2E scope boundary | Software reboot proven; cold ungraceful power-cycle resilience unverified | Software reboot cannot be claimed as cold power-loss proof; power-cut file corruption / bridge state resilience not tested. |
 
 ## Summary counts
 
-23 claim rows; labels overlap and must not be summed as separate tests.
+25 claim rows; labels overlap and must not be summed as separate tests.
 
 | Label | Rows |
 |---|---:|
 | CODE-PROVEN | 12 |
-| EXECUTION-PROVEN | 6 |
-| PHYSICAL-PROVEN | 11 |
+| EXECUTION-PROVEN | 8 |
+| PHYSICAL-PROVEN | 12 |
 | PRODUCT-PROVEN | 3 |
-| REPORT-ONLY | 20 |
+| REPORT-ONLY | 19 |
 | NOT-VALIDATED | 4 |
 
-Only current source inspection adds new project implementation evidence in CONTROL-1. Historical acceptance remains bounded by the reported LAB environment; present operational readiness is not inferred.
+Current physical and execution qualification in PI-RUNTIME-2A–2E adds direct evidence for the supported Node 24 runtime on ARM64 Pi hardware. Historical acceptance remains bounded by the reported LAB environment; present operational readiness for Client #1 remains bounded by pending D7 admin credential closure.

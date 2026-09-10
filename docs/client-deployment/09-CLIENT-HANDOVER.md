@@ -117,7 +117,7 @@ echo "Transfer archive securely to client password vault/storage, confirm custod
    * **Important Enrollment Note:** Replacement K14 requires separately restoring/re-enrolling terminal users and hardware configuration according to an authorized migration procedure. The bridge synchronization worker polls attendance logs and users from the hardware, but does not automatically push cloud user records into a blank terminal.
 2. **Bridge Controller Failure (Raspberry Pi):**
    * Provision replacement Raspberry Pi following `04-RASPBERRY-PI-INSTALLATION.md`.
-   * Re-assign device static IP and install approved Node.js runtime.
+   * Re-assign device static IP and install qualified Node.js 24 LTS runtime.
    * Retrieve existing `DEVICE_TOKEN` securely or generate new device token using `03-APPLICATION-PROVISIONING.md`.
 
 ### C. Full Environment Reconstruction Protocol

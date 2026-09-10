@@ -67,7 +67,9 @@ This guide provides fast, deterministic troubleshooting workflows for issues enc
   nc -zv <K14_IP> 4370                            # Must succeed
   ```
 * **Strict DO NOT DO:** Do not connect K14 to the office Wi-Fi router. Keep it directly connected to the Pi.
+* **Startup Timing Note (Transient ENETUNREACH at Boot):** Immediately following a Pi boot or reboot, the worker service may initialize before `<PI_K14_INTERFACE>` finishes carrier negotiation. This produces an initial `connect ENETUNREACH` in PM2 logs. The worker contains built-in retry logic where the second connection attempt succeeds once carrier = 1 (verified in PI-RUNTIME-2E). Verify carrier with `cat /sys/class/net/<PI_K14_INTERFACE>/carrier` before treating an initial boot ENETUNREACH as a fault.
 * **Remediation:** Re-seat RJ45 cable clips. On K14 menu, verify `Comm.` $\rightarrow$ `Ethernet` shows `<K14_IP>`, `<K14_NETMASK>`, `Gateway: 0.0.0.0`, `Port: 4370`.
+
 
 ---
 
@@ -80,10 +82,10 @@ This guide provides fast, deterministic troubleshooting workflows for issues enc
   curl -I https://<APP_DOMAIN>/api/health
 
   # Check PM2 worker status on Pi
-  pm2 status
-  pm2 logs zkteco-sync-worker --err --lines 30 --nostream
+  /opt/node24/bin/node /opt/node24/lib/node_modules/pm2/bin/pm2 status
+  /opt/node24/bin/node /opt/node24/lib/node_modules/pm2/bin/pm2 logs zkteco-sync-worker --err --lines 30 --nostream
   ```
-* **Remediation:** If PM2 shows errored, restart with `pm2 restart zkteco-sync-worker --update-env`. Verify `API_BASE_URL` in `/opt/attendance-bridge/.env`.
+* **Remediation:** If PM2 shows errored, restart with `/opt/node24/bin/node /opt/node24/lib/node_modules/pm2/bin/pm2 restart zkteco-sync-worker --update-env`. Verify `API_BASE_URL` in `/opt/attendance-bridge/.env`.
 
 ---
 
@@ -93,7 +95,7 @@ This guide provides fast, deterministic troubleshooting workflows for issues enc
 * **Safe Diagnostic Checks:**
   1. Inspect PM2 logs on Pi to verify batch transmission:
      ```bash
-     pm2 logs zkteco-sync-worker --lines 30 --nostream
+     /opt/node24/bin/node /opt/node24/lib/node_modules/pm2/bin/pm2 logs zkteco-sync-worker --lines 30 --nostream
      ```
   2. *(Exceptional administrative recovery procedure)* Trigger an immediate sync request directly via database state update:
      ```bash
@@ -139,26 +141,104 @@ This guide provides fast, deterministic troubleshooting workflows for issues enc
 * **Likely Causes:** Malformed `.env` file; invalid JSON in response; missing compiled build output.
 * **Safe Diagnostic Checks:**
   ```bash
-  pm2 logs zkteco-sync-worker --err --lines 50 --nostream
+  /opt/node24/bin/node /opt/node24/lib/node_modules/pm2/bin/pm2 logs zkteco-sync-worker --err --lines 50 --nostream
   ```
-* **Remediation:** Review error stack trace. Ensure `.env` contains valid `API_BASE_URL` with `https://` and exact variable names (`SYNC_INTERVAL_CRON`). If build output is missing, rebuild with `cd /opt/attendance-bridge && npm run build`.
+* **Remediation:** Review error stack trace. Ensure `.env` contains valid `API_BASE_URL` with `https://` and exact variable names (`SYNC_INTERVAL_CRON`). If build output is missing, rebuild with `cd /opt/attendance-bridge && /opt/node24/bin/node /opt/node24/lib/node_modules/npm/bin/npm-cli.js run build`.
 
 ---
 
-### Symptom 10: Raspberry Pi Rebooted and Worker Did Not Auto-Start
+### Symptom 10: Raspberry Pi Rebooted and Worker Did Not Auto-Start / PM2 Node Version Mismatch
 
-* **Likely Causes:** `pm2 startup` systemd service was not enabled or privileged registration command was not executed.
+* **Likely Causes:** `pm2 startup` systemd service was not enabled; privileged registration command was not executed; or PM2 daemon started under an unconfigured Node binary instead of `/opt/node24/bin/node`.
 * **Safe Diagnostic Checks:**
   ```bash
   systemctl is-enabled pm2-<PI_USER>.service
+  systemctl status pm2-<PI_USER>.service
   ls -la ~/.pm2/dump.pm2
+
+  # Check effective systemd service commands:
+  systemctl show pm2-<PI_USER>.service -p ExecStart -p ExecReload -p ExecStop -p Environment
+
+  # Verify PM2 supervisor daemon executable:
+  PM2_DAEMON_PID=$(pgrep -u <PI_USER> -f "PM2.*Daemon" || pgrep -u <PI_USER> -f "PM2.*God Daemon" || echo "")
+  readlink -f "/proc/$PM2_DAEMON_PID/exe"   # Must equal: /opt/node24/bin/node
+
+  # Verify worker executable, interpreter, and working directory:
+  WORKER_PID=$(pgrep -f "dist/index.js" | head -n 1)
+  readlink -f "/proc/$WORKER_PID/exe"       # Must equal: /opt/node24/bin/node
+  readlink -f "/proc/$WORKER_PID/cwd"       # Must equal: /opt/attendance-bridge
+  /opt/node24/bin/node /opt/node24/lib/node_modules/pm2/bin/pm2 show zkteco-sync-worker | grep -Ei 'exec mode|node version|interpreter|script path'
   ```
 * **Remediation:**
+  > [!IMPORTANT]
+  > **Authoritative Controlled Migration Protocol Notice:**
+  > Writing a systemd drop-in and running `systemctl daemon-reload` alone does **NOT** migrate an already-running PM2 daemon (which retains its active launch binary in memory space).
+  >
+  > Do **NOT** attempt ad-hoc inline service restarts or uncoordinated process killing.
+  >
+  > **STOP** normal troubleshooting flow and execute the authoritative 12-step supervisor migration protocol in:
+  > **[`04-RASPBERRY-PI-INSTALLATION.md`](04-RASPBERRY-PI-INSTALLATION.md) — Stage 6, Step 4: Controlled 12-Step PM2 Supervisor Migration Protocol.**
+  >
+  > That authoritative protocol enforces:
+  > 1. Pre-migration state assertion on `dump.pm2`.
+  > 2. Explicit command resets (`ExecStart=`, `ExecReload=`, `ExecStop=`) under Node 24.
+  > 3. Strict effective systemd configuration assertions.
+  > 4. Controlled service restart.
+  > 5. Active ownership correlation (`OS_PID == PM2_PID`).
+  > 6. Post-migration `dump.pm2` assertion and logrotate configuration.
+
+  **Secondary Diagnostic Health Check (Informational Only):**
+  > [!NOTE]
+  > This check provides quick secondary diagnostics after executing the authoritative migration procedure. It does **NOT** replace or weaken the full fail-closed gates (daemon/worker cardinality, exact argv vector parsing, dump.pm2 validation, and reboot proof) defined in [`04-RASPBERRY-PI-INSTALLATION.md`](04-RASPBERRY-PI-INSTALLATION.md) Stage 6.
   ```bash
-  pm2 startup systemd
-  # Execute the privileged sudo command returned by pm2 startup (e.g. sudo env PATH=$PATH:... pm2 startup systemd -u <PI_USER> --hp /home/<PI_USER>)
-  pm2 save
+  # 1. Verify systemd service is active:
+  test "$(systemctl is-active pm2-<PI_USER>.service)" = "active" || {
+    echo "ERROR: pm2-<PI_USER>.service is not active! STOP."; exit 1;
+  }
+
+  # 2. Verify PM2 daemon runs under /opt/node24/bin/node and count is exactly 1:
+  DAEMON_PIDS=$(pgrep -u <PI_USER> -f "PM2 v[0-9]|PM2.*Daemon|PM2.*God Daemon")
+  test $(echo "$DAEMON_PIDS" | grep -v "^$" | wc -l) -eq 1 || {
+    echo "ERROR: PM2 daemon count is not 1! PIDs: $DAEMON_PIDS. STOP."; exit 1;
+  }
+  PM2_DAEMON_PID=$(echo "$DAEMON_PIDS" | tr -d "[:space:]")
+  test "$(readlink -f /proc/$PM2_DAEMON_PID/exe)" = "/opt/node24/bin/node" || {
+    echo "ERROR: PM2 daemon executable mismatch! Expected /opt/node24/bin/node. STOP."; exit 1;
+  }
+
+  # 3. Verify worker PID correlation and properties:
+  PM2_JSON=$(/opt/node24/bin/node /opt/node24/lib/node_modules/pm2/bin/pm2 jlist)
+  PM2_PID=$(/opt/node24/bin/node -e '
+    const d = JSON.parse(process.argv[1]);
+    if (!Array.isArray(d) || d.length !== 1) process.exit(1);
+    const p = d[0];
+    if (p.name !== "zkteco-sync-worker" || (p.pm2_env && p.pm2_env.status) !== "online") process.exit(1);
+    if (typeof p.pid !== "number" || p.pid <= 0) process.exit(1);
+    console.log(p.pid);
+  ' "$PM2_JSON") || {
+    echo "ERROR: PM2 online worker state verification failed! STOP."; exit 1;
+  }
+
+  OS_PIDS=$(pgrep -f "dist/index.js")
+  test $(echo "$OS_PIDS" | grep -v "^$" | wc -l) -eq 1 || {
+    echo "ERROR: Expected exactly 1 OS worker process! PIDs: $OS_PIDS. STOP."; exit 1;
+  }
+  OS_PID=$(echo "$OS_PIDS" | tr -d "[:space:]")
+
+  test "$OS_PID" = "$PM2_PID" || {
+    echo "ERROR: Process ownership mismatch (OS: $OS_PID != PM2: $PM2_PID)! STOP."; exit 1;
+  }
+
+  test "$(readlink -f /proc/$PM2_PID/exe)" = "/opt/node24/bin/node" || {
+    echo "ERROR: Worker executable mismatch! STOP."; exit 1;
+  }
+  test "$(readlink -f /proc/$PM2_PID/cwd)" = "/opt/attendance-bridge" || {
+    echo "ERROR: Worker cwd mismatch! STOP."; exit 1;
+  }
+
+  echo "PM2 supervisor and worker verified under /opt/node24/bin/node (Secondary Diagnostics Passed)."
   ```
+
 
 ---
 

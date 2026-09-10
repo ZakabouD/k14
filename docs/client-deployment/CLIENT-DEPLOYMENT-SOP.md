@@ -80,8 +80,8 @@ The validated commercial architecture is strictly single-tenant:
 | **Reverse Proxy** | Caddy 2 | `caddy:2-alpine` (Compose image; automated ACME TLS) | `FLOATING IMAGE MAJOR` |
 | **VPS Base Image** | Node.js (Cloud Build) | `node:22-alpine` (Dockerfile build container image) | `FLOATING IMAGE MAJOR` |
 | **VPS Host OS** | Ubuntu Linux | Ubuntu 24.04 LTS (deployment policy target) | `DEPLOYMENT POLICY TARGET` |
-| **Pi Hardware Target** | Raspberry Pi | Pi 4B 2GB physically proven in LAB; Pi 5 NOT-VALIDATED | `HISTORICALLY PHYSICALLY TESTED` / `NOT-VALIDATED` |
-| **Pi Bridge Runtime** | Node.js (On-Site) | Node 20.20.2 proven in LAB (EOL); Node 22 ARM64 NOT-VALIDATED | `EOL` / `NOT-VALIDATED` (Gated) |
+| **Pi Hardware Target** | Raspberry Pi | Pi 4B (2GB+ RAM) physically proven in LAB; Pi 5 NOT-VALIDATED | `PHYSICALLY QUALIFIED` / `NOT-VALIDATED` |
+| **Pi Bridge Runtime** | Node.js (On-Site) | Node.js 24.20.0 LTS, npm 11.19.0, PM2 7.0.4 on Debian GNU/Linux 13.5 (trixie) ARM64; Debian 12 (bookworm) is NOT-VALIDATED; Node 20 is EOL (historical reference only) | `PHYSICALLY QUALIFIED / EXECUTION-PROVEN` |
 | **Timezone Baseline** | System & App Clock | `Africa/Casablanca` (IANA timezone database identifier) | `ACTIVE POLICY` |
 | **Deduplication Key** | PostgreSQL Schema | Compound unique index `(zktecoUserId, recordTime)` on `RawPunch` | `CODE-PROVEN` (Single Terminal) |
 
@@ -140,8 +140,19 @@ The validated commercial architecture is strictly single-tenant:
 
 ### PHASE 3: Dedicated Raspberry Pi Bridge Preparation
 * **Guide Reference:** [`04-RASPBERRY-PI-INSTALLATION.md`](04-RASPBERRY-PI-INSTALLATION.md)
-* **Goal:** Flash Raspberry Pi OS Lite (64-bit), set hostname `attendance-<CLIENT_SLUG>-pi`, set timezone `Africa/Casablanca`, configure dual-homed network (`<PI_UPLINK_INTERFACE>` default route, `<PI_K14_INTERFACE>` static `<PI_K14_IP>/<K14_NETMASK>` with no gateway), await Node.js runtime qualification gate sign-off, build bridge worker via `npm ci --include=dev` and `npx prisma generate`, configure `.env` mode `600` with `SYNC_INTERVAL_CRON`, execute privileged `pm2 startup` systemd command, enable boot persistence.
-* **Stop / Go Gate:** `pm2 status` shows `zkteco-sync-worker` online; `systemctl is-enabled pm2-<PI_USER>.service` returns `enabled`.
+* **Goal:** Flash Raspberry Pi OS Lite (64-bit), set hostname `attendance-<CLIENT_SLUG>-pi`, set timezone `Africa/Casablanca`, configure dual-homed network (`<PI_UPLINK_INTERFACE>` default route, `<PI_K14_INTERFACE>` static `<PI_K14_IP>/<K14_NETMASK>` with no gateway), install qualified Node.js 24 LTS (Node 24.20.0, npm 11.19.0, PM2 7.0.4 under `/opt/node24`), build bridge worker under Node 24 via canonical npm CLI (`ci --include=dev`, `run generate`, `run build`), configure `.env` mode `600` with `SYNC_INTERVAL_CRON`, execute privileged `pm2 startup` systemd command with Node 24 drop-in, enable boot persistence.
+* **Stop / Go Gate:** Successful completion and assertion of **ALL** fail-closed gates in [`04-RASPBERRY-PI-INSTALLATION.md`](04-RASPBERRY-PI-INSTALLATION.md) (Stages 1 through 7):
+  1. Clean / safely reconciled prior state (host inspection asserts clean filesystem, process table, systemd, cron, sockets; ambiguity = STOP).
+  2. Exact qualified runtime versions verified: Node 24.20.0, npm 11.19.0, PM2 7.0.4 under `/opt/node24`.
+  3. Approved source revision built under canonical Node 24 npm CLI (`ci --include=dev`, `run generate`, `run build`).
+  4. Exactly one PM2-managed poller active; zero duplicate or manual pollers.
+  5. Active ownership correlation PROVEN: OS worker PID strictly equals PM2-managed PID (`OS_PID == PM2_PID`).
+  6. Both PM2 supervisor daemon and worker execute strictly under `/opt/node24/bin/node` with working directory `/opt/attendance-bridge`.
+  7. Exact saved PM2 state in `dump.pm2` contains exactly 1 worker under `/opt/node24/bin/node`.
+  8. Systemd drop-in persistence active with exact normalized command vectors (`ExecStart`, `ExecReload`, `ExecStop`), `PATH=/opt/node24/bin:...`, and `PM2_HOME=/home/<PI_USER>/.pm2`.
+  9. Controlled software reboot verified via workstation-stored UUID boot evidence (`PRE != POST`).
+  10. Post-reboot K14 TCP port 4370 recovery verified.
+  11. Post-reboot sync execution PROVEN via server-side database advancement beyond post-boot baseline (`lastSyncAt > POST_BOOT_BASELINE`) and bounded worker log completion without error.
 
 ---
 

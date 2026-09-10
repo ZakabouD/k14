@@ -31,7 +31,7 @@ Every commercial deployment must pass all 5 blocking gates before physical insta
 | Check | Verification Method | Requirement | Status |
 | :--- | :--- | :--- | :--- |
 | **Raspberry Pi Flashed** | Power on Pi with microSD flashed with Raspberry Pi OS Lite 64-bit | Boots cleanly, SSH enabled, hostname set | `BLOCKING` |
-| **Supported Pi Runtime Qualification** | Verify Node.js runtime qualification status | Node 20 is EOL; ARM64 Node 22 runtime qualification must be confirmed prior to production deployment | `BLOCKING` |
+| **Supported Pi Runtime Qualification** | Verify Node.js runtime qualification status | Node.js 24 LTS (exact: Node 24.20.0, npm 11.19.0, PM2 7.0.4) on Debian GNU/Linux 13.5 (trixie) ARM64 physically qualified in PI-RUNTIME-2. Debian 12 (bookworm) is NOT-VALIDATED. Node 20 is EOL (historical reference only) | `QUALIFIED / PASSED` |
 | **ZKTeco K14 Unboxed & Tested** | Connect 12V power adapter, verify screen lights up | Optical sensor ready, keypad responsive, UI active | `BLOCKING` |
 | **Single Terminal Scope Confirmed** | Confirm exactly 1 K14 terminal for this installation | Single-terminal architecture confirmed | `BLOCKING` |
 | **Direct RJ45 Patch Cable** | Inspect physical CAT5e/CAT6 patch cable | Tested, no broken clips, minimum 0.5m length | `BLOCKING` |
