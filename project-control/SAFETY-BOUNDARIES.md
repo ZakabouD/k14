@@ -29,7 +29,7 @@ REPORT-ONLY topology: dedicated Pi 4 (2 GB), hostname attendance-lab-pi, operati
 | First LAB device token exposed in transcript | Reportedly rotated via canonical provisioning | Never reproduce old/current token. Re-provisioning an existing ID rotates it; do not run for inspection. |
 | Temporary LAB Pi password exposed | Reportedly rotated interactively in D6 | New password stays private; no retrieval, transcript search, printing or storage in docs. |
 | R2 credentials exposed | Reportedly rotated | No current scope/rotation recheck; do not display configuration or assume prefix-scoped permissions. |
-| Dashboard admin password printed during D7 | No confirmed subsequent rotation | Treat as compromised until securely rotated before real Client #1. |
+| Dashboard admin password printed during D7 | OPERATIONALLY CLOSED / PASS | Rotated via bcrypt in `SystemSettings` singleton on commercial VPS `51.210.47.90`; old credential rejected, new credential accepted; `JWT_SECRET` rotated with dashboard container recreated; owner custody confirmed; temporary handover file deleted without wildcards (D7-CLOSURE-1–5). |
 | Dedicated LAB SSH private key | Must remain private | Never copy into repository/docs or expose; protect recovery mechanisms separately. |
 | Legacy/live secrets and historical Pi passwords | Outside this task | Do not surface or change casually. |
 

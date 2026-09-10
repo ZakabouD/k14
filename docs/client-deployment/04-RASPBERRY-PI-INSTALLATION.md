@@ -158,7 +158,7 @@ ip route
 > * **Operating System Boundary:** Debian 12 (bookworm) is **NOT-VALIDATED** (candidate requiring separate qualification if deployed).
 > * **Canonical Runtime Path:** Standalone installation at `/opt/node24/bin/node`. (NodeSource `/usr/bin/node` is an alternative that was NOT used in the physical qualification).
 > * **Historical Rollback:** Node 20.20.2 is EOL and strictly preserved for emergency rollback/reference only.
-> * *(Operational Blocker Reminder: Real Client #1 production deployment remains blocked solely by Historical D7 Admin Credential Closure until operational evidence is accepted).*
+> * *(Operational Status: Historical D7 Admin Credential Closure is OPERATIONALLY CLOSED / PASS; Client #1 is authorized to begin Phase 0).*
 
 ### Canonical Production Build Procedure:
 
